@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:scale.com)",
+      "Bash(npx:*)",
+      "Bash(npm install:*)",
+      "Bash(npm uninstall:*)",
+      "WebFetch(domain:ai-sdk.dev)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:gpt5-coding-examples.vercel.app)",
+      "Bash(npm run dev:*)",
+      "Read(//c/Users/varun/Pictures/dataset/**)",
+      "Bash(dir:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
