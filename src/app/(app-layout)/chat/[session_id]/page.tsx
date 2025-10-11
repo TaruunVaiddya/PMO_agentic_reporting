@@ -12,12 +12,10 @@ import {
 } from '@/components/ai-elements/conversation';
 import {
   WebPreview,
-  WebPreviewNavigation,
-  WebPreviewNavigationButton,
-  WebPreviewUrl,
   WebPreviewBody
 } from '@/components/ai-elements/web-preview-vercel';
-import { MessageSquare, X, ChevronLeft, ChevronRight, RotateCcw, ExternalLink } from 'lucide-react';
+import { WebPreviewControls } from '@/components/ai-elements/web-preview-controls';
+import { MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -30,47 +28,38 @@ interface ChatSessionPageProps {
 export default function ChatSessionPage({ params }: ChatSessionPageProps) {
   const { session_id } = React.use(params);
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
-  const [previewData, setPreviewData] = useState<{
-    html: string;
-    css: string;
-    js: string;
-    title: string;
-    isVisible: boolean;
-    isStreaming: boolean;
-  }>({ html: '', css: '', js: '', title: '', isVisible: false, isStreaming: false });
+  const [previewData, setPreviewData] = useState({
+    html: '',
+    css: '',
+    js: '',
+    title: '',
+    isVisible: false,
+    isStreaming: false
+  });
 
   const handleCopy = (content: string) => {
     navigator.clipboard.writeText(content);
     // You can add a toast notification here
-    console.log('Message copied to clipboard');
   };
 
   const handleRetry = (messageId: string) => {
     // Implement retry logic here
-    console.log('Retrying message:', messageId);
   };
 
   const handleLike = (messageId: string) => {
     // Implement like logic here
-    console.log('Liked message:', messageId);
   };
 
   const handleDislike = (messageId: string) => {
     // Implement dislike logic here
-    console.log('Disliked message:', messageId);
   };
 
   const handlePreviewClick = (toolCall: ToolCallData) => {
-    console.log('🚀 handlePreviewClick called');
-    console.log('📊 Current previewData:', previewData);
-    console.log('🔧 ToolCall data:', toolCall);
-
     // Force close and reopen to ensure clean state
     setPreviewData(prev => ({ ...prev, isVisible: false }));
 
     // Use setTimeout to ensure state update happens
     setTimeout(() => {
-      console.log('⚡ Setting new preview data...');
       const newPreviewData = {
         html: toolCall.output?.html || '',
         css: toolCall.output?.css || '',
@@ -79,7 +68,6 @@ export default function ChatSessionPage({ params }: ChatSessionPageProps) {
         isVisible: true,
         isStreaming: false
       };
-      console.log('📝 New preview data:', newPreviewData);
       setPreviewData(newPreviewData);
     }, 50);
   };
@@ -92,9 +80,6 @@ export default function ChatSessionPage({ params }: ChatSessionPageProps) {
   };
 
   const handleSubmit = async (message: PromptInputMessage) => {
-    console.log('Message submitted:', message);
-    console.log('Session ID:', session_id);
-
     // Add user message
     const userMessage: ChatMessageData = {
       id: Date.now().toString(),
@@ -402,9 +387,7 @@ function drawSignupsChart() {
 }
 
 drawRevenueChart();
-drawSignupsChart();
-
-console.log('Dashboard charts rendered successfully!');`;
+drawSignupsChart();`;
 
     // Complete all tasks and show preview
     setTimeout(() => {
@@ -475,10 +458,10 @@ console.log('Dashboard charts rendered successfully!');`;
   };
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full overflow-hidden">
       {/* Left Panel - Chat */}
       <div className={cn(
-        "flex flex-col transition-all duration-300",
+        "flex flex-col transition-all duration-300 ease-in-out",
         previewData.isVisible ? "w-1/2" : "w-full"
       )}>
         {/* Chat Conversation Area */}
@@ -522,57 +505,15 @@ console.log('Dashboard charts rendered successfully!');`;
 
       {/* Right Panel - Preview */}
       {previewData.isVisible && (
-        <div className="w-1/2 border-l border-border relative">
-          {/* Close Button */}
-          <button
-            onClick={handleClosePreview}
-            className="absolute top-2 right-2 z-10 p-1.5 rounded-md bg-background/80 hover:bg-background border border-border shadow-sm transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-
+        <div className="w-1/2 border-l border-border relative animate-in slide-in-from-right duration-300">
           <WebPreview style={{ height: '100%' }}>
-            <WebPreviewNavigation>
-              <WebPreviewNavigationButton
-                tooltip="Go back"
-                onClick={() => console.log('Go back')}
-              >
-                <ChevronLeft className="size-4" />
-              </WebPreviewNavigationButton>
-              <WebPreviewNavigationButton
-                tooltip="Go forward"
-                onClick={() => console.log('Go forward')}
-              >
-                <ChevronRight className="size-4" />
-              </WebPreviewNavigationButton>
-              <WebPreviewNavigationButton
-                tooltip="Reload"
-                onClick={() => console.log('Reload')}
-              >
-                <RotateCcw className="size-4" />
-              </WebPreviewNavigationButton>
-              <WebPreviewUrl src={previewData.title} readOnly />
-              <WebPreviewNavigationButton
-                tooltip="Open in new tab"
-                onClick={() => {
-                  const blob = new Blob([`
-<!DOCTYPE html>
-<html>
-<head>
-  <style>${previewData.css}</style>
-</head>
-<body>
-  ${previewData.html}
-  <script>${previewData.js}</script>
-</body>
-</html>`], { type: 'text/html' });
-                  const url = URL.createObjectURL(blob);
-                  window.open(url, '_blank');
-                }}
-              >
-                <ExternalLink className="size-4" />
-              </WebPreviewNavigationButton>
-            </WebPreviewNavigation>
+            <WebPreviewControls
+              title={previewData.title}
+              html={previewData.html}
+              css={previewData.css}
+              js={previewData.js}
+              onClose={handleClosePreview}
+            />
             <WebPreviewBody
               html={previewData.html}
               css={previewData.css}

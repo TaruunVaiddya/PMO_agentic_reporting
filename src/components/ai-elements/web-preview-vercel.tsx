@@ -87,7 +87,7 @@ export const WebPreviewNavigation: React.FC<WebPreviewNavigationProps> = ({
     <TooltipProvider>
       <div
         className={cn(
-          'flex items-center justify-center gap-1 px-2 py-2 bg-muted/30 border-b border-border',
+          'flex items-center gap-1 px-2 py-2 bg-muted/30 border-b border-border',
           className
         )}
       >
@@ -119,7 +119,7 @@ export const WebPreviewNavigationButton: React.FC<WebPreviewNavigationButtonProp
       size="icon"
       onClick={onClick}
       disabled={disabled}
-      className={cn('h-7 w-7 rounded-md hover:bg-accent', className)}
+      className={cn('h-9 w-9 rounded-md hover:bg-accent cursor-pointer', className)}
     >
       {children}
     </Button>
@@ -169,12 +169,13 @@ export const WebPreviewUrl: React.FC<WebPreviewUrlProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mx-1 flex-1" style={{ maxWidth: '70%' }}>
+    <form onSubmit={handleSubmit} className="flex-1 flex justify-center px-2">
       <div
         className={cn(
           'flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border border-border hover:border-border/80 transition-colors h-9',
           className
         )}
+        style={{ width: '60%', maxWidth: '600px' }}
       >
         <div className="flex-1 overflow-hidden">
           <input
@@ -182,7 +183,7 @@ export const WebPreviewUrl: React.FC<WebPreviewUrlProps> = ({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             readOnly={readOnly}
-            className="w-full bg-transparent text-xs text-foreground outline-none border-none"
+            className="w-full bg-transparent text-xs text-foreground text-center outline-none border-none"
             placeholder="Enter URL..."
           />
         </div>
@@ -278,85 +279,8 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
   );
 };
 
-// WebPreviewConsole Component
-export interface ConsoleLog {
-  level: 'log' | 'warn' | 'error' | 'info';
-  message: string;
-  timestamp: Date;
-}
-
-export interface WebPreviewConsoleProps {
-  logs?: ConsoleLog[];
-  className?: string;
-  maxHeight?: string;
-}
-
-export const WebPreviewConsole: React.FC<WebPreviewConsoleProps> = ({
-  logs = [],
-  className,
-  maxHeight = '200px',
-}) => {
-  const getLogColor = (level: ConsoleLog['level']) => {
-    switch (level) {
-      case 'error':
-        return 'text-red-500';
-      case 'warn':
-        return 'text-yellow-500';
-      case 'info':
-        return 'text-blue-500';
-      default:
-        return 'text-foreground';
-    }
-  };
-
-  const getLogIcon = (level: ConsoleLog['level']) => {
-    switch (level) {
-      case 'error':
-        return '✖';
-      case 'warn':
-        return '⚠';
-      case 'info':
-        return 'ℹ';
-      default:
-        return '›';
-    }
-  };
-
-  if (!logs.length) {
-    return null;
-  }
-
-  return (
-    <div
-      className={cn(
-        'border-t border-border bg-muted/10 p-3 font-mono text-xs overflow-auto',
-        className
-      )}
-      style={{ maxHeight }}
-    >
-      <div className="space-y-1">
-        {logs.map((log, index) => (
-          <div key={index} className="flex items-start gap-2">
-            <span className={cn('flex-shrink-0', getLogColor(log.level))}>
-              {getLogIcon(log.level)}
-            </span>
-            <span className="flex-1 text-muted-foreground break-all">
-              {log.message}
-            </span>
-            <span className="flex-shrink-0 text-muted-foreground/50 text-[10px]">
-              {log.timestamp.toLocaleTimeString()}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// Display names
 WebPreview.displayName = 'WebPreview';
 WebPreviewNavigation.displayName = 'WebPreviewNavigation';
 WebPreviewNavigationButton.displayName = 'WebPreviewNavigationButton';
 WebPreviewUrl.displayName = 'WebPreviewUrl';
 WebPreviewBody.displayName = 'WebPreviewBody';
-WebPreviewConsole.displayName = 'WebPreviewConsole';
