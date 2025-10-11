@@ -1,17 +1,17 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const [isResending, setIsResending] = useState(false)
   const [resendMessage, setResendMessage] = useState("")
   const [resendError, setResendError] = useState("")
   const searchParams = useSearchParams()
-  const router = useRouter()
   const email = searchParams.get("email") || ""
 
   const handleResendEmail = async () => {
@@ -42,24 +42,23 @@ export default function VerifyEmailPage() {
     }
   }
 
-
   return (
     <div className="min-h-screen flex items-center justify-center dark bg-background  px-4 ">
       <div className="w-full max-w-md space-y-8">
         <Card className="border-none inset bg-card/50 backdrop-blur-xl rounded-3xl shadow-2xl">
           <CardHeader className="space-y-1 text-center pb-8">
             <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
-              <svg 
-                className="w-10 h-10 text-primary" 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                className="w-10 h-10 text-primary"
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" 
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                 />
               </svg>
             </div>
@@ -73,7 +72,7 @@ export default function VerifyEmailPage() {
               {email}
             </p>
           </CardHeader>
-          
+
           <CardContent className="space-y-6">
             <div className="text-center space-y-4">
               <p className="text-sm text-muted-foreground">
@@ -93,7 +92,7 @@ export default function VerifyEmailPage() {
               </div>
             )}
 
-            <Button 
+            <Button
               onClick={handleResendEmail}
               className="w-full h-12 rounded-xl font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 shadow-lg hover:shadow-xl"
               size="lg"
@@ -125,16 +124,16 @@ export default function VerifyEmailPage() {
 
             <div className="flex flex-col gap-3">
               <Link href="/login">
-                <Button 
+                <Button
                   variant="outline"
                   className="w-full h-12 rounded-xl bg-background border-border text-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200"
                 >
                   Back to login
                 </Button>
               </Link>
-              
+
               <Link href="/signup">
-                <Button 
+                <Button
                   variant="ghost"
                   className="w-full h-12 rounded-xl text-muted-foreground hover:text-foreground transition-all duration-200"
                 >
@@ -150,5 +149,17 @@ export default function VerifyEmailPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center dark bg-background">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    }>
+      <VerifyEmailContent />
+    </Suspense>
   )
 }

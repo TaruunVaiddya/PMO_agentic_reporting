@@ -16,8 +16,11 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-export function AppSidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+interface AppSidebarProps {
+  isCollapsed?: boolean;
+}
+
+export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
   const [favoritesExpanded, setFavoritesExpanded] = useState(false)
   const [recentChatsExpanded, setRecentChatsExpanded] = useState(true)
 
@@ -75,7 +78,7 @@ export function AppSidebar() {
       </div> */}
 
       {/* Top Navigation */}
-      <div className="p-3 space-y-1">
+      <div className="p-3 mt-2 space-y-1">
         {navItems.map((item, index) => (
           <Button
             key={index}
