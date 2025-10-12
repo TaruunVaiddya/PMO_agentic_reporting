@@ -15,6 +15,7 @@ import {
   WebPreviewBody
 } from '@/components/ai-elements/web-preview-vercel';
 import { WebPreviewControls } from '@/components/ai-elements/web-preview-controls';
+import { useSidebar } from '@/contexts/sidebar-context';
 import { MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +28,7 @@ interface ChatSessionPageProps {
 
 export default function ChatSessionPage({ params }: ChatSessionPageProps) {
   const { session_id } = React.use(params);
+  const { collapse } = useSidebar();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [previewData, setPreviewData] = useState({
     html: '',
@@ -55,6 +57,9 @@ export default function ChatSessionPage({ params }: ChatSessionPageProps) {
   };
 
   const handlePreviewClick = (toolCall: ToolCallData) => {
+    // Automatically collapse sidebar when preview opens
+    collapse();
+
     // Force close and reopen to ensure clean state
     setPreviewData(prev => ({ ...prev, isVisible: false }));
 
@@ -391,6 +396,8 @@ drawSignupsChart();`;
 
     // Complete all tasks and show preview
     setTimeout(() => {
+      // Automatically collapse sidebar when preview opens
+      collapse();
 
       // Show preview
       setPreviewData({
