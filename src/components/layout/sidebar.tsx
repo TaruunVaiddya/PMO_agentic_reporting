@@ -2,6 +2,7 @@
 "use client"
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Plus,
   Search,
@@ -10,24 +11,38 @@ import {
   Clock,
   ChevronDown,
   ChevronRight,
-  MoreHorizontal,
-  ChevronLeft
+  MoreHorizontal
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { SearchModal } from './search-modal'
 
 interface AppSidebarProps {
   isCollapsed?: boolean;
 }
 
 export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
+  const router = useRouter()
   const [favoritesExpanded, setFavoritesExpanded] = useState(false)
   const [recentChatsExpanded, setRecentChatsExpanded] = useState(true)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+
+  const handleNewChat = () => {
+    router.push('/chat')
+  }
+
+  const handleSearch = () => {
+    setIsSearchOpen(true)
+  }
+
+  const handleReports = () => {
+    router.push('/reports')
+  }
 
   const navItems = [
-    { icon: Plus, label: 'New Chat', active: true },
-    { icon: Search, label: 'Search' },
-    { icon: FileText, label: 'My Reports' },
+    { icon: Plus, label: 'New Chat', active: true, onClick: handleNewChat },
+    { icon: Search, label: 'Search', onClick: handleSearch },
+    { icon: FileText, label: 'My Reports', onClick: handleReports },
     { icon: Layers, label: 'Report Templates' },
     { icon: Clock, label: 'Recent Chats' },
   ]
@@ -60,22 +75,6 @@ export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
       "h-[calc(100vh-3rem)] bg-background flex flex-col transition-all duration-300 overflow-hidden relative",
       isCollapsed ? "w-16" : "w-64"
     )}>
-      {/* Header with collapse button */}
-      {/* <div className="h-12 flex items-center justify-between px-3 border-b border-border">
-        {!isCollapsed && (
-          <div className="text-sm font-medium text-foreground">
-            Menu
-          </div>
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="h-8 w-8"
-        >
-          <ChevronLeft className={cn("h-4 w-4 transition-transform", isCollapsed && "rotate-180")} />
-        </Button>
-      </div> */}
 
       {/* Top Navigation */}
       <div className="p-3 mt-2 space-y-1">
@@ -84,6 +83,7 @@ export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
             key={index}
             variant={item.active ? "secondary" : "ghost"}
             size="sm"
+            onClick={item.onClick}
             className={cn(
               " text-sm font-medium transition-colors cursor-pointer",
               isCollapsed ? "w-8 px-0 justify-center" : "w-full justify-start px-3",
@@ -169,6 +169,8 @@ export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
           </div>
         </>
       )}
+
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </div>
   )
 }
