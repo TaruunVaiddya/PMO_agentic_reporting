@@ -11,8 +11,8 @@ function ChatLayoutContent({children}: {children: React.ReactNode}) {
   return (
     <>
       <AppSidebar isCollapsed={isCollapsed} />
-      <div className='flex-1 flex flex-col pb-3 pl-1'>
-        <div className='w-full h-full rounded-l-lg overflow-hidden dark bg-card border border-white/10 border-r-0 relative'>
+      <div className='flex-1 flex flex-col p-3 pl-1'>
+        <div className='w-full h-full rounded-lg overflow-hidden dark bg-card border border-white/10 relative'>
           {/* Sidebar Toggle Button - Positioned absolutely to avoid re-renders */}
           <SidebarToggle
             isCollapsed={isCollapsed}

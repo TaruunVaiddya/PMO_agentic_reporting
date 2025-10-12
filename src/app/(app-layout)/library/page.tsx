@@ -6,6 +6,7 @@ import { DocumentCard } from '@/components/library/document-card'
 import { DocumentListItem } from '@/components/library/document-list-item'
 import { UploadModal } from '@/components/library/upload-modal'
 import { PdfPreviewDrawer } from '@/components/library/pdf-preview-drawer'
+import { MetallicButton } from '@/components/ui/metallic-button'
 
 export default function LibraryPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -298,21 +299,10 @@ export default function LibraryPage() {
                 </button>
               </div>
 
-              <div className="relative group">
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="relative flex items-center gap-2 px-4 py-2 bg-black/10 hover:bg-black/20 backdrop-blur-sm rounded-lg transition-all duration-300 text-sm font-medium text-white/80 hover:text-white cursor-pointer border border-white/10 hover:border-white/20 overflow-hidden"
-                >
-                  <div
-                    className="absolute inset-0 z-0 pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity duration-300 bg-[radial-gradient(circle, rgba(148,163,184,0.25) 0%, rgba(100,116,139,0.12) 50%, rgba(71,85,105,0) 100%)]"
-                    style={{
-                      background: "radial-gradient(circle, rgba(148,163,184,0.25) 0%, rgba(100,116,139,0.12) 20%, rgba(71,85,105,0) 70%)"
-                    }}
-                  />
-                  <Upload className="w-4 h-4 relative z-10" />
-                  <span className="relative z-10">Upload</span>
-                </button>
-              </div>
+              <MetallicButton onClick={() => setShowUploadModal(true)}>
+                <Upload className="w-4 h-4" />
+                <span>Upload</span>
+              </MetallicButton>
             </div>
           </div>
 
@@ -407,21 +397,10 @@ export default function LibraryPage() {
               <p className="text-sm text-white/60 mb-8 max-w-md">
                 Start by uploading your first document. We support PDF and Excel files for AI-powered analysis and insights.
               </p>
-              <div className="relative group">
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="relative flex items-center gap-3 px-6 py-3 bg-black/10 hover:bg-black/20 backdrop-blur-sm rounded-lg transition-all duration-300 text-sm font-medium text-white/80 hover:text-blue-400 cursor-pointer border border-white/10 hover:border-white/20 overflow-hidden"
-                >
-                  <div
-                    className="absolute inset-0 z-0 pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity duration-300"
-                    style={{
-                      background: "radial-gradient(circle, rgba(59,130,246,0.25) 0%, rgba(37,99,235,0.12) 50%, rgba(29,78,216,0) 100%)"
-                    }}
-                  />
-                  <Upload className="w-4 h-4 relative z-10" />
-                  <span className="relative z-10">Upload Your First Document</span>
-                </button>
-              </div>
+              <MetallicButton onClick={() => setShowUploadModal(true)} className="px-6 py-3 gap-3">
+                <Upload className="w-4 h-4" />
+                <span>Upload Your First Document</span>
+              </MetallicButton>
             </div>
           ) : filteredDocuments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">

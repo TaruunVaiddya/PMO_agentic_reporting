@@ -9,14 +9,13 @@ import {
   PromptInputAttachment,
   PromptInputToolbar,
   PromptInputTools,
-  PromptInputActionMenu,
-  PromptInputActionMenuTrigger,
-  PromptInputActionMenuContent,
-  PromptInputActionAddAttachments,
   PromptInputSubmit,
   PromptInputMessage
 } from '@/components/ai-elements/prompt-input';
-import { Plus, Search, Globe } from 'lucide-react';
+import { Globe, FileText, MessageCircleQuestion } from 'lucide-react';
+import { MetallicButton } from '@/components/ui/metallic-button';
+
+export type ChatMode = 'web-search' | 'report-generation' | 'data-qa' | null;
 
 interface ChatInputProps {
   onSubmit: (message: PromptInputMessage) => void;
@@ -33,6 +32,11 @@ export function ChatInput({
 }: ChatInputProps) {
   const [inputValue, setInputValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<ChatMode>(null);
+
+  const handleModeToggle = (mode: ChatMode) => {
+    setSelectedMode(prev => prev === mode ? null : mode);
+  };
 
   const handleSubmit = async (message: PromptInputMessage) => {
     if (disabled) return;
@@ -40,8 +44,12 @@ export function ChatInput({
     setIsSubmitting(true);
 
     try {
-      await onSubmit(message);
-      setInputValue(''); // Reset input after successful submission
+      const messageWithMode = {
+        ...message,
+        mode: selectedMode
+      };
+      await onSubmit(messageWithMode);
+      setInputValue('');
     } catch (error) {
       console.error('Error submitting message:', error);
     } finally {
@@ -77,32 +85,39 @@ export function ChatInput({
       </PromptInputBody>
       <PromptInputToolbar className="bg-black/10">
         <PromptInputTools>
-          <div className="flex items-center gap-1">
-            <PromptInputActionMenu>
-              <PromptInputActionMenuTrigger className="text-white/80 hover:text-white hover:bg-black/20 rounded-lg transition-colors">
-                <Plus className="h-4 w-4" />
-              </PromptInputActionMenuTrigger>
-              <PromptInputActionMenuContent className="bg-card border-white/10">
-                <PromptInputActionAddAttachments className="text-white/80 hover:bg-black/20 hover:text-white" />
-              </PromptInputActionMenuContent>
-            </PromptInputActionMenu>
-
-            <button
+          <div className="flex items-center gap-1.5">
+            <MetallicButton
               type="button"
-              className="p-2 text-white/80 hover:text-white hover:bg-black/20 rounded-lg transition-colors"
+              onClick={() => handleModeToggle('web-search')}
+              isActive={selectedMode === 'web-search'}
+              variant="compact"
               disabled={disabled}
             >
-              <Search className="h-4 w-4" />
-            </button>
+              <Globe className="h-3.5 w-3.5" />
+              <span>Web Search</span>
+            </MetallicButton>
 
-            <button
+            <MetallicButton
               type="button"
-              className="px-3 py-2 text-white/80 hover:text-white hover:bg-black/20 rounded-lg transition-colors flex items-center gap-2 text-sm"
+              onClick={() => handleModeToggle('report-generation')}
+              isActive={selectedMode === 'report-generation'}
+              variant="compact"
               disabled={disabled}
             >
-              <Globe className="h-4 w-4" />
-              <span>Search</span>
-            </button>
+              <FileText className="h-3.5 w-3.5" />
+              <span>Report Generation</span>
+            </MetallicButton>
+
+            <MetallicButton
+              type="button"
+              onClick={() => handleModeToggle('data-qa')}
+              isActive={selectedMode === 'data-qa'}
+              variant="compact"
+              disabled={disabled}
+            >
+              <MessageCircleQuestion className="h-3.5 w-3.5" />
+              <span>Data Q&A</span>
+            </MetallicButton>
           </div>
         </PromptInputTools>
         <PromptInputSubmit
