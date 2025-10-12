@@ -537,7 +537,7 @@ drawSignupsChart();`;
     <div className="flex h-full overflow-hidden">
       {useResizablePanels && previewData.isVisible && !isClosing ? (
         <PanelGroup direction="horizontal" className="h-full">
-          <Panel defaultSize={50} minSize={30} maxSize={70} className="flex flex-col">
+          <Panel defaultSize={30} minSize={30} maxSize={70} className="flex flex-col">
             {chatContent}
           </Panel>
 
@@ -545,7 +545,7 @@ drawSignupsChart();`;
             <div className="absolute inset-y-0 -left-1 -right-1" />
           </PanelResizeHandle>
 
-          <Panel defaultSize={50} minSize={30} maxSize={70} className="border-l border-border relative">
+          <Panel defaultSize={70} minSize={30} maxSize={70} className="border-l border-border relative">
             {previewContent}
           </Panel>
         </PanelGroup>
@@ -553,14 +553,14 @@ drawSignupsChart();`;
         <>
           <div className={cn(
             "flex flex-col transition-all duration-300 ease-in-out",
-            shouldShowPreview ? "w-1/2" : "w-full"
+            shouldShowPreview ? "w-[30%]" : "w-full"
           )}>
             {chatContent}
           </div>
 
           {shouldShowPreview && (
             <div className={cn(
-              "w-1/2 border-l border-border relative transition-all duration-300 ease-in-out",
+              "w-[70%] border-l border-border relative transition-all duration-300 ease-in-out",
               isClosing ? "translate-x-full opacity-0" : "translate-x-0 opacity-100"
             )}>
               {previewContent}
