@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, Clock, FileText, MessageSquare, X } from 'lucide-react'
+import { Search, Plus, Layers, FileText, MessageSquare, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface SearchModalProps {
@@ -29,6 +29,16 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
   const handleNewChat = () => {
     router.push('/chat')
+    onClose()
+  }
+
+  const handleReports = () => {
+    router.push('/reports')
+    onClose()
+  }
+
+  const handleTemplates = () => {
+    router.push('/report-templates')
     onClose()
   }
 
@@ -88,13 +98,15 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
             </button>
 
             <button
+              onClick={handleTemplates}
               className="flex flex-col items-center gap-2 p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors group"
             >
-              <Clock className="h-5 w-5 text-white/70 group-hover:text-white transition-colors" />
-              <span className="text-xs text-white/70 group-hover:text-white transition-colors">Recent</span>
+              <Layers className="h-5 w-5 text-white/70 group-hover:text-white transition-colors" />
+              <span className="text-xs text-white/70 group-hover:text-white transition-colors">Templates</span>
             </button>
 
             <button
+              onClick={handleReports}
               className="flex flex-col items-center gap-2 p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors group"
             >
               <FileText className="h-5 w-5 text-white/70 group-hover:text-white transition-colors" />

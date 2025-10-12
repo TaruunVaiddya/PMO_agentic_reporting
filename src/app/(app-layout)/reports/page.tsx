@@ -2,10 +2,16 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Plus, Search } from 'lucide-react'
 import { ReportGrid } from '@/components/reports/report-grid'
 import { ReportCardData } from '@/components/reports/report-card'
-import { Search, Filter, Plus, X, ArrowLeft } from 'lucide-react'
+import { ReportsFilterPanel } from '@/components/reports/reports-filter-panel'
 import { MetallicButton } from '@/components/ui/metallic-button'
+import { BackButton } from '@/components/ui/back-button'
+import { SearchBar } from '@/components/ui/search-bar'
+import { FilterButton } from '@/components/ui/filter-button'
+import { EmptyState } from '@/components/ui/empty-state'
+import { useSearchFilter } from '@/hooks/use-search-filter'
 
 export default function Reports() {
   const router = useRouter()
@@ -71,28 +77,21 @@ export default function Reports() {
     }
   ]
 
-  // Filter reports based on search and status
-  const filteredReports = userReports.filter(report => {
-    const matchesSearch = searchQuery === '' ||
-      report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      report.description.toLowerCase().includes(searchQuery.toLowerCase())
-
-    const matchesStatus = filterStatus === 'all' || report.status === filterStatus
-
-    return matchesSearch && matchesStatus
+  const filteredReports = useSearchFilter({
+    items: userReports,
+    searchQuery,
+    searchFields: ['name', 'description'],
+    filterField: 'status',
+    filterValue: filterStatus
   })
 
-  const handleReportClick = (report: ReportCardData) => {
-    console.log('Report clicked:', report)
+  const handleReportClick = () => {
     // TODO: Navigate to report details or preview
   }
 
-  const handleNewReport = () => {
-    router.push('/chat')
-  }
-
-  const handleBack = () => {
-    router.back()
+  const clearAllFilters = () => {
+    setSearchQuery('')
+    setFilterStatus('all')
   }
 
   return (
@@ -101,124 +100,31 @@ export default function Reports() {
         {/* Top Toolbar */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 flex-shrink-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-            {/* Back Button */}
-            <button
-              onClick={handleBack}
-              className="p-2 rounded-lg bg-black/10 hover:bg-black/20 border border-white/10 text-white/70 hover:text-white transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-
-            {/* Search Bar */}
-            <div className="relative flex-1 sm:flex-initial w-full sm:w-auto">
-              <Search className="w-4 h-4 text-white/50 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search reports..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full sm:w-64 pl-10 pr-4 py-2 rounded-lg bg-black/10 border border-white/10 text-sm text-white/80 placeholder:text-white/30 focus:outline-none focus:border-white/30 transition-colors"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-
-            {/* Filter Button */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`px-3 py-2 rounded-lg border transition-all duration-200 flex items-center gap-2 cursor-pointer ${
-                  showFilters || filterStatus !== 'all'
-                    ? 'bg-blue-600/20 border-blue-500/30 text-blue-400'
-                    : 'bg-black/10 hover:bg-black/20 border-white/10 text-white/80'
-                }`}
-              >
-                <Filter className="w-4 h-4" />
-                <span className="text-sm">Filters</span>
-                {filterStatus !== 'all' && (
-                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-500/30 rounded-full">
-                    1
-                  </span>
-                )}
-              </button>
-            </div>
+            <BackButton onClick={() => router.back()} />
+            <SearchBar
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search reports..."
+            />
+            <FilterButton
+              onClick={() => setShowFilters(!showFilters)}
+              isActive={showFilters || filterStatus !== 'all'}
+              activeCount={filterStatus !== 'all' ? 1 : 0}
+            />
           </div>
 
-          {/* New Report Button */}
-          <div className="flex items-center gap-3">
-            <MetallicButton onClick={handleNewReport}>
-              <Plus className="w-4 h-4" />
-              <span>New Report</span>
-            </MetallicButton>
-          </div>
+          <MetallicButton onClick={() => router.push('/chat')}>
+            <Plus className="w-4 h-4" />
+            <span>New Report</span>
+          </MetallicButton>
         </div>
 
         {/* Filter Panel */}
         {showFilters && (
-          <div className="mb-6 p-4 bg-card rounded-lg border border-white/10 flex-shrink-0">
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-white/60">Status:</span>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setFilterStatus('all')}
-                    className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
-                      filterStatus === 'all'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-black/10 text-white/60 hover:bg-black/20'
-                    }`}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => setFilterStatus('completed')}
-                    className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
-                      filterStatus === 'completed'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-black/10 text-white/60 hover:bg-black/20'
-                    }`}
-                  >
-                    Completed
-                  </button>
-                  <button
-                    onClick={() => setFilterStatus('processing')}
-                    className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
-                      filterStatus === 'processing'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-black/10 text-white/60 hover:bg-black/20'
-                    }`}
-                  >
-                    Processing
-                  </button>
-                  <button
-                    onClick={() => setFilterStatus('failed')}
-                    className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
-                      filterStatus === 'failed'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-black/10 text-white/60 hover:bg-black/20'
-                    }`}
-                  >
-                    Failed
-                  </button>
-                </div>
-              </div>
-
-              {filterStatus !== 'all' && (
-                <button
-                  onClick={() => setFilterStatus('all')}
-                  className="ml-auto px-3 py-1 rounded text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors cursor-pointer"
-                >
-                  Clear Filters
-                </button>
-              )}
-            </div>
-          </div>
+          <ReportsFilterPanel
+            filterStatus={filterStatus}
+            onFilterChange={setFilterStatus}
+          />
         )}
 
         {/* Results count */}
@@ -240,30 +146,15 @@ export default function Reports() {
               />
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-16 h-16 rounded-xl bg-gradient-to-t from-white/5 to-white/10 border border-white/10 flex items-center justify-center mb-4">
-                <Search className="w-8 h-8 text-white/50" />
-              </div>
-              <h3 className="text-lg font-semibold text-white/80 mb-2">
-                No reports found
-              </h3>
-              <p className="text-sm text-white/50 mb-4">
-                {searchQuery
-                  ? `No reports match "${searchQuery}"`
-                  : 'Try adjusting your filters'}
-              </p>
-              {(searchQuery || filterStatus !== 'all') && (
-                <button
-                  onClick={() => {
-                    setSearchQuery('')
-                    setFilterStatus('all')
-                  }}
-                  className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer"
-                >
-                  Clear all filters
-                </button>
-              )}
-            </div>
+            <EmptyState
+              icon={Search}
+              title="No reports found"
+              description={searchQuery ? `No reports match "${searchQuery}"` : 'Try adjusting your filters'}
+              action={(searchQuery || filterStatus !== 'all') ? {
+                label: 'Clear all filters',
+                onClick: clearAllFilters
+              } : undefined}
+            />
           )}
         </div>
       </div>

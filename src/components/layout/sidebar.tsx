@@ -2,7 +2,7 @@
 "use client"
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import {
   Plus,
   Search,
@@ -23,6 +23,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const [favoritesExpanded, setFavoritesExpanded] = useState(false)
   const [recentChatsExpanded, setRecentChatsExpanded] = useState(true)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
@@ -39,36 +40,46 @@ export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
     router.push('/reports')
   }
 
+  const handleTemplates = () => {
+    router.push('/report-templates')
+  }
+
+  const isInChatSession = pathname?.startsWith('/chat/') || false
+
   const navItems = [
-    { icon: Plus, label: 'New Chat', active: true, onClick: handleNewChat },
+    { icon: Plus, label: 'New Chat', active: pathname === '/chat', onClick: handleNewChat },
     { icon: Search, label: 'Search', onClick: handleSearch },
-    { icon: FileText, label: 'My Reports', onClick: handleReports },
-    { icon: Layers, label: 'Report Templates' },
-    { icon: Clock, label: 'Recent Chats' },
+    { icon: FileText, label: 'My Reports', active: pathname === '/reports', onClick: handleReports },
+    { icon: Layers, label: 'Report Templates', active: pathname === '/report-templates', onClick: handleTemplates },
+    { icon: Clock, label: 'Recent Chats', onClick: handleSearch },
   ]
 
   const recentChats = [
-    { title: 'Metallic Silver Border Ca...', active: true },
-    { title: 'Model identification' },
-    { title: 'Knowledge graph UI' },
-    { title: 'Glow menu component' },
-    { title: 'Silver modal design' },
-    { title: 'Microfinance report' },
-    { title: 'Greeting' },
-    { title: 'Next.js login page' },
-    { title: 'Hello back' },
-    { title: 'React component optimization' },
-    { title: 'Database schema design' },
-    { title: 'API endpoint configuration' },
-    { title: 'User authentication flow' },
-    { title: 'Payment gateway integration' },
-    { title: 'Email notification system' },
-    { title: 'File upload functionality' },
-    { title: 'Search and filter implementation' },
-    { title: 'Dashboard analytics' },
-    { title: 'Mobile responsive design' },
-    { title: 'Performance monitoring' },
+    { id: 'session-1', title: 'Metallic Silver Border Ca...' },
+    { id: 'session-2', title: 'Model identification' },
+    { id: 'session-3', title: 'Knowledge graph UI' },
+    { id: 'session-4', title: 'Glow menu component' },
+    { id: 'session-5', title: 'Silver modal design' },
+    { id: 'session-6', title: 'Microfinance report' },
+    { id: 'session-7', title: 'Greeting' },
+    { id: 'session-8', title: 'Next.js login page' },
+    { id: 'session-9', title: 'Hello back' },
+    { id: 'session-10', title: 'React component optimization' },
+    { id: 'session-11', title: 'Database schema design' },
+    { id: 'session-12', title: 'API endpoint configuration' },
+    { id: 'session-13', title: 'User authentication flow' },
+    { id: 'session-14', title: 'Payment gateway integration' },
+    { id: 'session-15', title: 'Email notification system' },
+    { id: 'session-16', title: 'File upload functionality' },
+    { id: 'session-17', title: 'Search and filter implementation' },
+    { id: 'session-18', title: 'Dashboard analytics' },
+    { id: 'session-19', title: 'Mobile responsive design' },
+    { id: 'session-20', title: 'Performance monitoring' },
   ]
+
+  const handleChatClick = (sessionId: string) => {
+    router.push(`/chat/${sessionId}`)
+  }
 
   return (
     <div className={cn(
@@ -143,26 +154,33 @@ export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
             {recentChatsExpanded && (
               <div className="mb-3 mt-2 flex-1 overflow-y-auto custom-scrollbar">
                 <div className="space-y-1">
-                  {recentChats.map((chat, index) => (
-                    <div
-                      key={index}
-                      className={cn(
-                        "group flex items-center justify-between px-3 py-1 rounded-md text-sm transition-colors cursor-pointer",
-                        chat.active
-                          ? "bg-accent text-accent-foreground font-medium"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                      )}
-                    >
-                      <span className="truncate flex-1">{chat.title}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  {recentChats.map((chat) => {
+                    const isActive = pathname === `/chat/${chat.id}`
+                    return (
+                      <div
+                        key={chat.id}
+                        onClick={() => handleChatClick(chat.id)}
+                        className={cn(
+                          "group flex items-center justify-between px-3 py-1 rounded-md text-sm transition-colors cursor-pointer",
+                          isActive
+                            ? "bg-accent text-accent-foreground font-medium"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                        )}
                       >
-                        <MoreHorizontal className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
+                        <span className="truncate flex-1">{chat.title}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                          }}
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <MoreHorizontal className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}

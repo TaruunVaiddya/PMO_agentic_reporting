@@ -1,4 +1,4 @@
-import { ArrowRight, LucideIcon } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 export interface ReportCardData {
   id?: string;
