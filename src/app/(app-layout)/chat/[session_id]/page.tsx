@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChatInput } from '@/components/chat/chat-input';
 import { ChatMessage, type ChatMessageData, type ToolCallData } from '@/components/chat/chat-message';
 import { PromptInputMessage } from '@/components/ai-elements/prompt-input';
@@ -18,6 +18,7 @@ import { WebPreviewControls } from '@/components/ai-elements/web-preview-control
 import { useSidebar } from '@/contexts/sidebar-context';
 import { MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 
 
 interface ChatSessionPageProps {
@@ -26,8 +27,10 @@ interface ChatSessionPageProps {
   }>;
 }
 
+const ANIMATION_DURATION = 300;
+
 export default function ChatSessionPage({ params }: ChatSessionPageProps) {
-  const { session_id } = React.use(params);
+  React.use(params);
   const { collapse } = useSidebar();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [previewData, setPreviewData] = useState({
@@ -35,53 +38,64 @@ export default function ChatSessionPage({ params }: ChatSessionPageProps) {
     css: '',
     js: '',
     title: '',
-    isVisible: false,
-    isStreaming: false
+    isVisible: false
   });
+
+  const [useResizablePanels, setUseResizablePanels] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    if (previewData.isVisible && !isClosing && !useResizablePanels) {
+      const timer = setTimeout(() => {
+        setUseResizablePanels(true);
+      }, ANIMATION_DURATION);
+
+      return () => clearTimeout(timer);
+    } else if ((isClosing || !previewData.isVisible) && useResizablePanels) {
+      setUseResizablePanels(false);
+    }
+  }, [previewData.isVisible, useResizablePanels, isClosing]);
 
   const handleCopy = (content: string) => {
     navigator.clipboard.writeText(content);
-    // You can add a toast notification here
   };
 
   const handleRetry = (messageId: string) => {
-    // Implement retry logic here
+    // TODO: Implement retry logic
   };
 
   const handleLike = (messageId: string) => {
-    // Implement like logic here
+    // TODO: Implement like logic
   };
 
   const handleDislike = (messageId: string) => {
-    // Implement dislike logic here
+    // TODO: Implement dislike logic
   };
 
   const handlePreviewClick = (toolCall: ToolCallData) => {
-    // Automatically collapse sidebar when preview opens
     collapse();
-
-    // Force close and reopen to ensure clean state
     setPreviewData(prev => ({ ...prev, isVisible: false }));
 
-    // Use setTimeout to ensure state update happens
     setTimeout(() => {
-      const newPreviewData = {
+      setPreviewData({
         html: toolCall.output?.html || '',
         css: toolCall.output?.css || '',
         js: toolCall.output?.js || '',
         title: toolCall.output?.title || 'Dashboard Preview',
-        isVisible: true,
-        isStreaming: false
-      };
-      setPreviewData(newPreviewData);
+        isVisible: true
+      });
     }, 50);
   };
 
   const handleClosePreview = () => {
+    setIsClosing(true);
     setPreviewData(prev => ({
       ...prev,
       isVisible: false
     }));
+    setTimeout(() => {
+      setIsClosing(false);
+    }, 50);
   };
 
   const handleSubmit = async (message: PromptInputMessage) => {
@@ -396,17 +410,14 @@ drawSignupsChart();`;
 
     // Complete all tasks and show preview
     setTimeout(() => {
-      // Automatically collapse sidebar when preview opens
       collapse();
 
-      // Show preview
       setPreviewData({
         html: dashboardHTML,
         css: dashboardCSS,
         js: dashboardJS,
         title: 'Sales Dashboard',
-        isVisible: true,
-        isStreaming: false
+        isVisible: true
       });
 
       setMessages(prev => prev.map(msg =>
@@ -464,71 +475,99 @@ drawSignupsChart();`;
     }, 2000);
   };
 
-  return (
-    <div className="flex h-full overflow-hidden">
-      {/* Left Panel - Chat */}
-      <div className={cn(
-        "flex flex-col transition-all duration-300 ease-in-out",
-        previewData.isVisible ? "w-1/2" : "w-full"
-      )}>
-        {/* Chat Conversation Area */}
-        <div className='flex-1 overflow-hidden'>
-          <Conversation className="w-full h-full overflow-y-auto custom-scrollbar">
-              <ConversationContent className="max-w-2xl mx-auto">
-              {messages.length === 0 ? (
-                  <ConversationEmptyState
-                  icon={<MessageSquare className="size-12" />}
-                  title="No messages yet"
-                  description="Start a conversation to see messages here. I can help you analyze Excel and PDF files, generate reports, and answer questions about your data."
-                  />
-              ) : (
-                  messages.map((message) => (
-                    <ChatMessage
-                      key={message.id}
-                      message={message}
-                      onCopy={handleCopy}
-                      onRetry={handleRetry}
-                      onLike={handleLike}
-                      onDislike={handleDislike}
-                      onPreviewClick={handlePreviewClick}
-                    />
-                  ))
-              )}
-              </ConversationContent>
-              <ConversationScrollButton />
-          </Conversation>
-        </div>
-
-        {/* Chat Input at Bottom - Fixed */}
-        <div className="bg-card/50 backdrop-blur-sm">
-          <div className="max-w-3xl mx-auto p-4">
-            <ChatInput
-              onSubmit={handleSubmit}
-              placeholder="Type a message..."
-            />
-          </div>
+  const chatContent = (
+    <>
+      <div className='flex-1 overflow-hidden'>
+        <Conversation className="w-full h-full overflow-y-auto custom-scrollbar">
+          <ConversationContent className="max-w-2xl mx-auto">
+            {messages.length === 0 ? (
+              <ConversationEmptyState
+                icon={<MessageSquare className="size-12" />}
+                title="No messages yet"
+                description="Start a conversation to see messages here. I can help you analyze Excel and PDF files, generate reports, and answer questions about your data."
+              />
+            ) : (
+              messages.map((message) => (
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  onCopy={handleCopy}
+                  onRetry={handleRetry}
+                  onLike={handleLike}
+                  onDislike={handleDislike}
+                  onPreviewClick={handlePreviewClick}
+                />
+              ))
+            )}
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
+      </div>
+      <div className="bg-card/50 backdrop-blur-sm">
+        <div className="max-w-3xl mx-auto p-4">
+          <ChatInput
+            onSubmit={handleSubmit}
+            placeholder="Type a message..."
+          />
         </div>
       </div>
+    </>
+  );
 
-      {/* Right Panel - Preview */}
-      {previewData.isVisible && (
-        <div className="w-1/2 border-l border-border relative animate-in slide-in-from-right duration-300">
-          <WebPreview style={{ height: '100%' }}>
-            <WebPreviewControls
-              title={previewData.title}
-              html={previewData.html}
-              css={previewData.css}
-              js={previewData.js}
-              onClose={handleClosePreview}
-            />
-            <WebPreviewBody
-              html={previewData.html}
-              css={previewData.css}
-              js={previewData.js}
-            />
-          </WebPreview>
-        </div>
+  const shouldShowPreview = previewData.isVisible || isClosing;
+
+  const previewContent = shouldShowPreview && (
+    <WebPreview style={{ height: '100%' }}>
+      <WebPreviewControls
+        title={previewData.title}
+        html={previewData.html}
+        css={previewData.css}
+        js={previewData.js}
+        onClose={handleClosePreview}
+      />
+      <WebPreviewBody
+        html={previewData.html}
+        css={previewData.css}
+        js={previewData.js}
+      />
+    </WebPreview>
+  );
+
+  return (
+    <div className="flex h-full overflow-hidden">
+      {useResizablePanels && previewData.isVisible && !isClosing ? (
+        <PanelGroup direction="horizontal" className="h-full">
+          <Panel defaultSize={50} minSize={30} maxSize={70} className="flex flex-col">
+            {chatContent}
+          </Panel>
+
+          <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize relative group">
+            <div className="absolute inset-y-0 -left-1 -right-1" />
+          </PanelResizeHandle>
+
+          <Panel defaultSize={50} minSize={30} maxSize={70} className="border-l border-border relative">
+            {previewContent}
+          </Panel>
+        </PanelGroup>
+      ) : (
+        <>
+          <div className={cn(
+            "flex flex-col transition-all duration-300 ease-in-out",
+            shouldShowPreview ? "w-1/2" : "w-full"
+          )}>
+            {chatContent}
+          </div>
+
+          {shouldShowPreview && (
+            <div className={cn(
+              "w-1/2 border-l border-border relative transition-all duration-300 ease-in-out",
+              isClosing ? "translate-x-full opacity-0" : "translate-x-0 opacity-100"
+            )}>
+              {previewContent}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
-}
+};
