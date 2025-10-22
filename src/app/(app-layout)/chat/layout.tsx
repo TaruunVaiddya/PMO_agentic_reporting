@@ -2,6 +2,7 @@
 
 import { AppSidebar } from '@/components/layout/sidebar'
 import { SidebarToggle } from '@/components/layout/sidebar-toggle'
+import { ChatStoreProvider } from '@/contexts/chat-provider';
 import { SidebarProvider, useSidebar } from '@/contexts/sidebar-context'
 import React from 'react'
 
@@ -19,7 +20,9 @@ function ChatLayoutContent({children}: {children: React.ReactNode}) {
             onToggle={toggle}
             className="absolute top-3 left-3 z-10"
           />
+          <ChatStoreProvider>
           {children}
+          </ChatStoreProvider>
         </div>
       </div>
     </>

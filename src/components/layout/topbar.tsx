@@ -93,13 +93,13 @@ export default function Topbar() {
         <button
           onClick={() => router.push('/chat')}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/10 transition-all duration-200 cursor-pointer ${
-            pathname === '/chat'
+            pathname?.startsWith('/chat')
               ? 'bg-gradient-to-r from-blue-900/40 to-blue-800/40 border-blue-500/30'
               : 'bg-gradient-to-r from-zinc-900/50 to-slate-900/50 hover:from-zinc-800/60 hover:to-slate-800/60'
           }`}
         >
-          <MessageSquare className={`w-4 h-4 ${pathname === '/chat' ? 'text-blue-400' : 'text-slate-300'}`} />
-          <span className={`text-sm font-medium ${pathname === '/chat' ? 'text-blue-400' : 'text-slate-300'}`}>Chat</span>
+          <MessageSquare className={`w-4 h-4 ${pathname?.startsWith('/chat') ? 'text-blue-400' : 'text-slate-300'}`} />
+          <span className={`text-sm font-medium ${pathname?.startsWith('/chat') ? 'text-blue-400' : 'text-slate-300'}`}>Chat</span>
         </button>
 
         <button

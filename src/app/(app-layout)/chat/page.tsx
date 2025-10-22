@@ -1,28 +1,95 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChatInput } from '@/components/chat/chat-input';
 import { PromptInputMessage } from '@/components/ai-elements/prompt-input';
-import { ArrowRight, FileText, TrendingUp, PieChart, BarChart3, Calendar, Users } from 'lucide-react';
+import { ArrowRight, TrendingUp, PieChart, BarChart3, Calendar } from 'lucide-react';
+import { ChatProviderContext } from '@/contexts/chat-provider';
+import SSEChatHandler from '@/services/chat-service';
+import generateUniqueId from '@/lib/get_unique_id';
 
 export default function Page() {
   const router = useRouter();
+  const chatStore = useContext(ChatProviderContext);
 
   const handleSubmit = async (message: PromptInputMessage) => {
     console.log('Message submitted:', message);
 
-    // Generate a hardcoded session ID for now
-    const sessionId = 'session-123';
+    if (!chatStore) {
+      console.error('Chat store not available');
+      return;
+    }
 
-    // Navigate to the chat session page
-    router.push(`/chat/${sessionId}`);
+    try {
+      // Generate a unique session ID
+      const sessionId = generateUniqueId();
+      
+      // Get selected agent from session storage (if any)
+      const selectedAgent = sessionStorage.getItem('selected-agent') || null;
+
+      // Create SSE handler with the new config object
+      const sseHandler = new SSEChatHandler({
+        chatStore,
+        input: message.text || '',
+        sessionId,
+        selected_agent: selectedAgent
+      });
+
+      // Start the chat and navigate to session page
+      sseHandler.startChat();
+      
+      // Navigate to the chat session page
+      router.push(`/chat/${sessionId}?chat=new`);
+    } catch (error) {
+      console.error('Failed to start chat:', error);
+      // You might want to show an error message to the user here
+    }
   };
 
-  const handleSuggestionClick = (suggestion: string) => {
-    // TODO: Pre-fill input with suggestion and submit
+  const handleSuggestionClick = async (suggestion: string) => {
     console.log('Suggestion clicked:', suggestion);
+
+    if (!chatStore) {
+      console.error('Chat store not available');
+      return;
+    }
+
+    try {
+      // Generate a unique session ID
+      const sessionId = generateUniqueId();
+      
+      // Get selected agent from session storage (if any)
+      const selectedAgent = sessionStorage.getItem('selected-agent') || null;
+
+      // Create SSE handler with the new config object
+      const sseHandler = new SSEChatHandler({
+        chatStore,
+        input: suggestion,
+        sessionId,
+        selected_agent: selectedAgent
+      });
+
+      // Start the chat and navigate to session page
+      await sseHandler.startChat();
+      
+      // Navigate to the chat session page
+      router.push(`/chat/${sessionId}`);
+    } catch (error) {
+      console.error('Failed to start chat:', error);
+      // You might want to show an error message to the user here
+    }
   };
+
+  
+  useEffect(() => {
+    if(chatStore) {
+      chatStore.setChat({});
+    }
+    if(!localStorage.getItem('user')) {
+      router.push('/login');
+    }
+  }, []);
 
   return (
     <div className="flex w-full flex-col items-center h-full overflow-y-auto custom-scrollbar pt-[8%]">
