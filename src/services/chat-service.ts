@@ -1,13 +1,12 @@
 import generateUniqueId from '@/lib/get_unique_id';
 
-
 export interface ChatServiceConfig {
   chatStore: any;
   input: string;
   sessionId?: string | null;
   selected_agent?: string | null;
+  is_new_chat?: boolean | false;
 }
-
 
 export default class SSEChatHandler {
     private chatId: string | null = null;
@@ -22,12 +21,14 @@ export default class SSEChatHandler {
     private input: string;
     private sessionId: string | null;
     private selected_agent: string | null;
-  
+    private is_new_chat: boolean | false;
+
     constructor(config: ChatServiceConfig) {
       this.chatStore = config.chatStore;
       this.input = config.input;
       this.sessionId = config.sessionId || null;
       this.selected_agent = config.selected_agent || null;
+      this.is_new_chat = config.is_new_chat || false;
     }
    
     private getId(): string {
@@ -42,19 +43,20 @@ export default class SSEChatHandler {
         role: 'user',
       }, this.chatId, 'user');
 
-
       try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
           method: 'POST',
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'text/event-stream',
           },
           body: JSON.stringify({ 
             query: this.input,
-            chat_id:this.chatId,
-            session_id:this.sessionId,
-            selected_agent:this.selected_agent,
+            chat_id: this.chatId,
+            session_id: this.sessionId,
+            selected_agent: this.selected_agent,
+            is_new_session: this.is_new_chat,
           }),
           signal: this.abortController.signal
         });
@@ -140,7 +142,7 @@ export default class SSEChatHandler {
         if (error.name !== 'AbortError') {
           console.error('Stream processing error:', error);
           if (this.chatId) {
-            this.chatStore?.updateChatStatus(this.chatId, 'Error');
+            this.chatStore?.updateChatStatus(this.chatId, 'Failed');
           }
         }
       } finally {

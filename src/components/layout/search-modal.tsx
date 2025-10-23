@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, Layers, FileText, MessageSquare, X } from 'lucide-react'
+import { Search, Plus, Layers, FileText, MessageSquare, X, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/get-fetcher'
 
 interface SearchModalProps {
   isOpen: boolean
@@ -13,18 +15,12 @@ interface SearchModalProps {
 export function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
+  
+  // Fetch dynamic sessions data using SWR
+  const { data: sessions = [], error, isLoading } = useSWR('/sessions', fetcher)
 
-  const recentChats = [
-    { id: '1', title: 'Microfinance dashboard UI', timestamp: '5 days ago' },
-    { id: '2', title: 'Greeting', timestamp: '10 days ago' },
-    { id: '3', title: 'Simple dashboard', timestamp: '10 days ago' },
-    { id: '4', title: 'Model identification', timestamp: '12 days ago' },
-    { id: '5', title: 'Knowledge graph UI', timestamp: '15 days ago' },
-    { id: '6', title: 'Glow menu component', timestamp: '18 days ago' },
-  ]
-
-  const filteredChats = recentChats.filter(chat =>
-    chat.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredChats = sessions.filter(session =>
+    session.title.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const handleNewChat = () => {
@@ -127,22 +123,45 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
         <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-4">
           <div className="space-y-1">
-            {filteredChats.length > 0 ? (
-              filteredChats.map((chat) => (
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-white/40" />
+                <span className="ml-2 text-sm text-white/40">Loading chats...</span>
+              </div>
+            ) : error ? (
+              <div className="px-4 py-8 text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-white/5 rounded-full mb-3">
+                  <Search className="h-5 w-5 text-white/40" />
+                </div>
+                <p className="text-white/40 text-sm">Failed to load chats</p>
+              </div>
+            ) : filteredChats.length > 0 ? (
+              filteredChats.map((session) => (
                 <button
-                  key={chat.id}
-                  onClick={() => handleChatClick(chat.id)}
+                  key={session.id}
+                  onClick={() => handleChatClick(session.id)}
                   className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-white/5 rounded-xl transition-colors group border border-transparent hover:border-white/10"
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="p-2 bg-white/5 rounded-lg group-hover:bg-white/10 transition-colors">
                       <MessageSquare className="h-4 w-4 text-white/60" />
                     </div>
-                    <span className="text-sm text-white/80 truncate group-hover:text-white transition-colors">{chat.title}</span>
+                    <span className="text-sm text-white/80 truncate group-hover:text-white transition-colors" title={session.title}>
+                      {session.title}
+                    </span>
                   </div>
-                  <span className="text-xs text-white/30 flex-shrink-0">{chat.timestamp}</span>
+                  <span className="text-xs text-white/30 flex-shrink-0">
+                    {new Date(session.updated_at).toLocaleDateString()}
+                  </span>
                 </button>
               ))
+            ) : sessions.length === 0 ? (
+              <div className="px-4 py-12 text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-white/5 rounded-full mb-3">
+                  <MessageSquare className="h-5 w-5 text-white/40" />
+                </div>
+                <p className="text-white/40 text-sm">No recent chats yet. Start a new conversation!</p>
+              </div>
             ) : (
               <div className="px-4 py-12 text-center">
                 <div className="inline-flex items-center justify-center w-12 h-12 bg-white/5 rounded-full mb-3">

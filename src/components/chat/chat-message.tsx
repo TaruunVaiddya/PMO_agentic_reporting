@@ -24,10 +24,11 @@ import { Copy, RefreshCw, ThumbsUp, ThumbsDown, Monitor, WrenchIcon, CircleIcon,
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
+// Use types from our centralized chat types
 export interface TaskData {
   id: string;
   title: string;
-  status: TaskStatus;
+  status: 'pending' | 'running' | 'completed' | 'error';
   description?: string;
   files?: string[];
 }

@@ -12,7 +12,7 @@ const useChatItem = (chatId: string): ChatItemType | null => {
     () => {
         return chatItem?.getChat(chatId)
     },
-    () => null
+    () => null 
   );
   return chatItemStore ?? null;
 };

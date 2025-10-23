@@ -11,11 +11,14 @@ import {
   Clock,
   ChevronDown,
   ChevronRight,
-  MoreHorizontal
+  MoreHorizontal,
+  Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { SearchModal } from './search-modal'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/get-fetcher'
 
 interface AppSidebarProps {
   isCollapsed?: boolean;
@@ -27,6 +30,9 @@ export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
   const [favoritesExpanded, setFavoritesExpanded] = useState(false)
   const [recentChatsExpanded, setRecentChatsExpanded] = useState(true)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  
+  // Fetch dynamic sessions data using SWR
+  const { data: sessions = [], error, isLoading } = useSWR('/sessions', fetcher)
 
   const handleNewChat = () => {
     router.push('/chat')
@@ -54,28 +60,7 @@ export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
     { icon: Clock, label: 'Recent Chats', onClick: handleSearch },
   ]
 
-  const recentChats = [
-    { id: 'session-1', title: 'Metallic Silver Border Ca...' },
-    { id: 'session-2', title: 'Model identification' },
-    { id: 'session-3', title: 'Knowledge graph UI' },
-    { id: 'session-4', title: 'Glow menu component' },
-    { id: 'session-5', title: 'Silver modal design' },
-    { id: 'session-6', title: 'Microfinance report' },
-    { id: 'session-7', title: 'Greeting' },
-    { id: 'session-8', title: 'Next.js login page' },
-    { id: 'session-9', title: 'Hello back' },
-    { id: 'session-10', title: 'React component optimization' },
-    { id: 'session-11', title: 'Database schema design' },
-    { id: 'session-12', title: 'API endpoint configuration' },
-    { id: 'session-13', title: 'User authentication flow' },
-    { id: 'session-14', title: 'Payment gateway integration' },
-    { id: 'session-15', title: 'Email notification system' },
-    { id: 'session-16', title: 'File upload functionality' },
-    { id: 'session-17', title: 'Search and filter implementation' },
-    { id: 'session-18', title: 'Dashboard analytics' },
-    { id: 'session-19', title: 'Mobile responsive design' },
-    { id: 'session-20', title: 'Performance monitoring' },
-  ]
+  // Sessions are now fetched dynamically from the API
 
   const handleChatClick = (sessionId: string) => {
     router.push(`/chat/${sessionId}`)
@@ -127,7 +112,7 @@ export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
             </Button>
 
             {favoritesExpanded && (
-              <div className=" border border-dashed border-border rounded-lg p-4">
+              <div className=" border border-dashed border-border rounded-lg p-4 mt-2">
                 <div className="text-center text-xs text-muted-foreground/70">
                   Favorite chats and projects that you use often.
                 </div>
@@ -154,33 +139,52 @@ export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
             {recentChatsExpanded && (
               <div className="mb-3 mt-2 flex-1 overflow-y-auto custom-scrollbar">
                 <div className="space-y-1">
-                  {recentChats.map((chat) => {
-                    const isActive = pathname === `/chat/${chat.id}`
-                    return (
-                      <div
-                        key={chat.id}
-                        onClick={() => handleChatClick(chat.id)}
-                        className={cn(
-                          "group flex items-center justify-between px-3 py-1 rounded-md text-sm transition-colors cursor-pointer",
-                          isActive
-                            ? "bg-accent text-accent-foreground font-medium"
-                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                        )}
-                      >
-                        <span className="truncate flex-1">{chat.title}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                          }}
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <MoreHorizontal className="h-3 w-3" />
-                        </Button>
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-sm text-muted-foreground">Loading chats...</span>
+                    </div>
+                  ) : error ? (
+                    <div className="px-3 py-2 text-sm text-destructive">
+                      Failed to load chats
+                    </div>
+                  ) : sessions.length === 0 ? (
+                    <div className="px-3 py-4 text-center">
+                      <div className="text-xs text-muted-foreground/70">
+                        No recent chats yet. Start a new conversation!
                       </div>
-                    )
-                  })}
+                    </div>
+                  ) : (
+                    sessions.map((session: any) => {
+                      const isActive = pathname === `/chat/${session.id}`
+                      return (
+                        <div
+                          key={session.id}
+                          onClick={() => handleChatClick(session.id)}
+                          className={cn(
+                            "group flex items-center justify-between px-3 py-1 rounded-md text-sm transition-colors cursor-pointer",
+                            isActive
+                              ? "bg-accent text-accent-foreground font-medium"
+                              : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                          )}
+                        >
+                          <span className="truncate flex-1" title={session.title}>
+                            {session.title}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                            }}
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <MoreHorizontal className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )
+                    })
+                  )}
                 </div>
               </div>
             )}

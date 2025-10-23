@@ -94,7 +94,6 @@ function useChatStore():ChatStoreType {
         return keys.length === 1 && !chatList.current[keys[0]].assistantMessage;
     },[])
 
-
     const notifyChatListListeners = useCallback(() => {
         chatListeners.current.forEach(listener => listener());
     },[])

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { ChatInput } from '@/components/chat/chat-input';
-import { ChatMessage, type ChatMessageData, type ToolCallData } from '@/components/chat/chat-message';
+import ChatMessageItem from '@/components/chat/chat-message-item';
 import { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import {
   Conversation,
@@ -19,7 +19,12 @@ import { useSidebar } from '@/contexts/sidebar-context';
 import { MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
-
+import useChatIds from '@/hooks/chat-store-hooks/use-chat-ids';
+import { ChatProviderContext } from '@/contexts/chat-provider';
+import SSEChatHandler from '@/services/chat-service';
+import type { ToolCallData } from '@/components/chat/chat-message';
+import { ChatListType, ChatStoreType } from '@/types/chat';
+import { fetcher } from '@/lib/get-fetcher';
 
 interface ChatSessionPageProps {
   params: Promise<{
@@ -29,10 +34,61 @@ interface ChatSessionPageProps {
 
 const ANIMATION_DURATION = 300;
 
-export default function ChatSessionPage({ params }: ChatSessionPageProps) {
-  React.use(params);
+export default function Page({ params }: ChatSessionPageProps) {
+  const resolvedParams = React.use(params);
+  const chatStore = useContext(ChatProviderContext);
+
+  useEffect(() => {
+    if(resolvedParams.session_id) {
+      (async () => {
+        try {
+          const response = await fetcher(`/conversations/${resolvedParams.session_id}`);
+          let chatList:ChatListType ={}
+          response?.forEach((chat: any) => {
+            chatList[chat.id] = {
+              userMessage: {
+                id: chat.id,
+                content: chat.query,
+                role: "user",
+              },
+              assistantMessage: {
+                id: chat.id,
+                content: chat.response,
+                role: "assistant",
+              },
+              status: "Completed",
+              created_at: new Date(chat.created_at),
+            };
+          });
+          console.log("appeend chat list=============================");
+          if (chatStore?.checkIfOnlyOneChat()) {
+            chatStore?.setChat({ ...chatStore?.getChatList(), ...chatList });
+          } else {
+            chatStore?.setChat(chatList);
+          }
+        } catch (error) {
+          console.error('Failed to fetch session:', error);
+        }
+      })();
+    }
+    
+  }, [resolvedParams.session_id]);
+
+  return (
+    <ChatSessionPage session_id={resolvedParams.session_id} chatStore={chatStore} />
+  )
+}
+
+const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatStore }: { session_id: string, chatStore: ChatStoreType | null}) {
   const { collapse } = useSidebar();
-  const [messages, setMessages] = useState<ChatMessageData[]>([]);
+  // Get all chat IDs for this session using the hook
+  const allChatIds = useChatIds();
+  
+  // Deduplicate chat IDs to prevent React key errors
+  const chatIds = React.useMemo(() => {
+    return Array.from(new Set(allChatIds));
+  }, [allChatIds]);
+  
   const [previewData, setPreviewData] = useState({
     html: '',
     css: '',
@@ -62,14 +118,17 @@ export default function ChatSessionPage({ params }: ChatSessionPageProps) {
 
   const handleRetry = (messageId: string) => {
     // TODO: Implement retry logic
+    console.log('Retry message:', messageId);
   };
 
   const handleLike = (messageId: string) => {
     // TODO: Implement like logic
+    console.log('Like message:', messageId);
   };
 
   const handleDislike = (messageId: string) => {
     // TODO: Implement dislike logic
+    console.log('Dislike message:', messageId);
   };
 
   const handlePreviewClick = (toolCall: ToolCallData) => {
@@ -99,380 +158,29 @@ export default function ChatSessionPage({ params }: ChatSessionPageProps) {
   };
 
   const handleSubmit = async (message: PromptInputMessage) => {
-    // Add user message
-    const userMessage: ChatMessageData = {
-      id: Date.now().toString(),
-      content: message.text || '',
-      sender: 'user',
-      timestamp: new Date(),
-      files: message.files
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-
-    // TODO: Implement API call to send message and get response
-    // For now, simulate a response with reasoning
-    const assistantId = (Date.now() + 1).toString();
-
-    // First, add assistant message with reasoning and tasks in streaming state
-    const assistantMessage: ChatMessageData = {
-      id: assistantId,
-      content: '',
-      reasoning: 'Let me analyze the user\'s request. They are asking about ' + (message.text || 'data analysis') + '. I should provide a helpful response that addresses their needs specifically. I\'ll consider what type of assistance they might need with their data files.',
-      sender: 'assistant',
-      timestamp: new Date(),
-      isStreaming: true,
-      tasks: [
-        {
-          id: 'task-1',
-          title: 'Analyzing request',
-          status: 'running',
-          description: 'Understanding user requirements'
-        },
-        {
-          id: 'task-2',
-          title: 'Preparing response',
-          status: 'pending',
-          description: 'Generating helpful suggestions'
-        },
-        {
-          id: 'task-3',
-          title: 'Check file requirements',
-          status: 'pending',
-          files: ['data.xlsx', 'report.pdf']
-        }
-      ],
-      toolCalls: [
-        {
-          id: 'preview-tool',
-          name: 'generate_preview',
-          state: 'input-streaming',
-          input: {
-            type: 'dashboard',
-            data_source: 'sales_data.xlsx',
-            chart_types: ['revenue_trend', 'signups_by_source']
-          }
-        }
-      ]
-    };
-
-    setMessages(prev => [...prev, assistantMessage]);
-
-    // Simulate task progression
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg =>
-        msg.id === assistantId
-          ? {
-              ...msg,
-              tasks: msg.tasks?.map(task =>
-                task.id === 'task-1' ? { ...task, status: 'completed' as const } :
-                task.id === 'task-2' ? { ...task, status: 'running' as const } :
-                task
-              )
-            }
-          : msg
-      ));
-    }, 1000);
-
-    // Define dashboard data outside setTimeout for reuse
-    const dashboardHTML = `<div class="dashboard">
-  <h1>Sales Dashboard</h1>
-  <div class="metrics">
-    <div class="metric-card">
-      <h3>Total Revenue</h3>
-      <span class="value">$125,430</span>
-      <span class="change positive">+8.2%</span>
-    </div>
-    <div class="metric-card">
-      <h3>Active Users</h3>
-      <span class="value">18,342</span>
-      <span class="change positive">+2.1%</span>
-    </div>
-    <div class="metric-card">
-      <h3>Churn Rate</h3>
-      <span class="value">3.4%</span>
-      <span class="change negative">-0.3%</span>
-    </div>
-    <div class="metric-card">
-      <h3>NPS</h3>
-      <span class="value">62</span>
-      <span class="change positive">+1</span>
-    </div>
-  </div>
-  <div class="charts">
-    <div class="chart-container">
-      <h3>Monthly Revenue</h3>
-      <canvas id="revenueChart" width="400" height="200"></canvas>
-    </div>
-    <div class="chart-container">
-      <h3>New Signups by Source</h3>
-      <canvas id="signupsChart" width="400" height="200"></canvas>
-    </div>
-  </div>
-</div>`;
-
-    const dashboardCSS = `body {
-  margin: 0;
-  padding: 20px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height: 100vh;
-}
-
-.dashboard {
-  max-width: 1200px;
-  margin: 0 auto;
-  background: white;
-  border-radius: 16px;
-  padding: 30px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-}
-
-.dashboard h1 {
-  text-align: center;
-  color: #333;
-  margin-bottom: 30px;
-  font-size: 2.5rem;
-  font-weight: 700;
-}
-
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 40px;
-}
-
-.metric-card {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 24px;
-  text-align: left;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.metric-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-}
-
-.metric-card h3 {
-  margin: 0 0 8px 0;
-  font-size: 0.875rem;
-  color: #6b7280;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.metric-card .value {
-  display: block;
-  font-size: 2rem;
-  font-weight: 700;
-  color: #111827;
-  margin-bottom: 4px;
-}
-
-.metric-card .change {
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.metric-card .change.positive {
-  color: #059669;
-}
-
-.metric-card .change.negative {
-  color: #dc2626;
-}
-
-.charts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 30px;
-}
-
-.chart-container {
-  background: #f9fafb;
-  border-radius: 12px;
-  padding: 24px;
-  border: 1px solid #e5e7eb;
-}
-
-.chart-container h3 {
-  margin: 0 0 20px 0;
-  font-size: 1.125rem;
-  color: #374151;
-  font-weight: 600;
-}
-
-canvas {
-  max-width: 100%;
-  height: auto;
-}`;
-
-    const dashboardJS = `// Revenue Chart
-const revenueCanvas = document.getElementById('revenueChart');
-const revenueCtx = revenueCanvas.getContext('2d');
-
-const revenueData = [40000, 45000, 52000, 48000, 58000, 62000, 65000, 68000, 72000, 75000, 78000, 82000];
-const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function drawRevenueChart() {
-  const padding = 40;
-  const chartWidth = revenueCanvas.width - padding * 2;
-  const chartHeight = revenueCanvas.height - padding * 2;
-  const maxValue = Math.max(...revenueData);
-  const minValue = Math.min(...revenueData);
-  const valueRange = maxValue - minValue;
-
-  revenueCtx.clearRect(0, 0, revenueCanvas.width, revenueCanvas.height);
-
-  // Draw line chart
-  revenueCtx.strokeStyle = '#3b82f6';
-  revenueCtx.lineWidth = 3;
-  revenueCtx.beginPath();
-
-  revenueData.forEach((value, index) => {
-    const x = padding + (index * (chartWidth / (revenueData.length - 1)));
-    const y = padding + chartHeight - ((value - minValue) / valueRange) * chartHeight;
-
-    if (index === 0) {
-      revenueCtx.moveTo(x, y);
-    } else {
-      revenueCtx.lineTo(x, y);
+    if (!chatStore) {
+      console.error('Chat store not available');
+      return;
     }
 
-    // Draw points
-    revenueCtx.save();
-    revenueCtx.fillStyle = '#3b82f6';
-    revenueCtx.beginPath();
-    revenueCtx.arc(x, y, 4, 0, Math.PI * 2);
-    revenueCtx.fill();
-    revenueCtx.restore();
+    try {
+      // Get selected agent from session storage (if any)
+      const selectedAgent = sessionStorage.getItem('selected-agent') || null;
 
-    // Draw month labels
-    revenueCtx.fillStyle = '#6b7280';
-    revenueCtx.font = '12px Arial';
-    revenueCtx.textAlign = 'center';
-    revenueCtx.fillText(months[index], x, revenueCanvas.height - 10);
-  });
-
-  revenueCtx.stroke();
-}
-
-// Signups Chart
-const signupsCanvas = document.getElementById('signupsChart');
-const signupsCtx = signupsCanvas.getContext('2d');
-
-const signupsData = [
-  { label: 'Organic', value: 850, color: '#10b981' },
-  { label: 'Paid', value: 650, color: '#3b82f6' },
-  { label: 'Referral', value: 420, color: '#8b5cf6' },
-  { label: 'Social', value: 520, color: '#f59e0b' },
-  { label: 'Direct', value: 680, color: '#ef4444' }
-];
-
-function drawSignupsChart() {
-  const padding = 40;
-  const chartWidth = signupsCanvas.width - padding * 2;
-  const chartHeight = signupsCanvas.height - padding * 2;
-  const maxValue = Math.max(...signupsData.map(d => d.value));
-  const barWidth = chartWidth / signupsData.length * 0.8;
-  const barSpacing = chartWidth / signupsData.length * 0.2;
-
-  signupsCtx.clearRect(0, 0, signupsCanvas.width, signupsCanvas.height);
-
-  signupsData.forEach((item, index) => {
-    const barHeight = (item.value / maxValue) * chartHeight;
-    const x = padding + (index * (chartWidth / signupsData.length)) + barSpacing / 2;
-    const y = padding + chartHeight - barHeight;
-
-    // Draw bar
-    signupsCtx.fillStyle = item.color;
-    signupsCtx.fillRect(x, y, barWidth, barHeight);
-
-    // Draw value on top
-    signupsCtx.fillStyle = '#374151';
-    signupsCtx.font = '12px Arial';
-    signupsCtx.textAlign = 'center';
-    signupsCtx.fillText(item.value, x + barWidth/2, y - 5);
-
-    // Draw label
-    signupsCtx.fillText(item.label, x + barWidth/2, signupsCanvas.height - 10);
-  });
-}
-
-drawRevenueChart();
-drawSignupsChart();`;
-
-    // Complete all tasks and show preview
-    setTimeout(() => {
-      collapse();
-
-      setPreviewData({
-        html: dashboardHTML,
-        css: dashboardCSS,
-        js: dashboardJS,
-        title: 'Sales Dashboard',
-        isVisible: true
+      // Create SSE handler with the config object
+      const sseHandler = new SSEChatHandler({
+        chatStore,
+        input: message.text || '',
+        sessionId: session_id,
+        selected_agent: selectedAgent
       });
 
-      setMessages(prev => prev.map(msg =>
-        msg.id === assistantId
-          ? {
-              ...msg,
-              content: "I understand you want to " + (message.text || 'help with your data') + ". I've created a sample dashboard for you to demonstrate our capabilities. Check the preview on the right!",
-              isStreaming: false,
-              reasoningDuration: 2,
-              tasks: msg.tasks?.map(task => ({ ...task, status: 'completed' as const }))
-            }
-          : msg
-      ));
-    }, 2000);
-
-    // Update tool call to show streaming state
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg =>
-        msg.id === assistantId && msg.toolCalls
-          ? {
-              ...msg,
-              toolCalls: msg.toolCalls.map(tool =>
-                tool.id === 'preview-tool'
-                  ? { ...tool, state: 'input-available' as const }
-                  : tool
-              )
-            }
-          : msg
-      ));
-    }, 1000);
-
-    // Complete the tool call with output data
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg =>
-        msg.id === assistantId && msg.toolCalls
-          ? {
-              ...msg,
-              toolCalls: msg.toolCalls.map(tool =>
-                tool.id === 'preview-tool'
-                  ? {
-                      ...tool,
-                      state: 'output-available' as const,
-                      output: {
-                        html: dashboardHTML,
-                        css: dashboardCSS,
-                        js: dashboardJS,
-                        title: 'Sales Dashboard'
-                      }
-                    }
-                  : tool
-              )
-            }
-          : msg
-      ));
-    }, 2000);
+      // Start the chat (SSE handler will update the store)
+      sseHandler.startChat();
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      // TODO: Show error toast to user
+    }
   };
 
   const chatContent = (
@@ -480,17 +188,18 @@ drawSignupsChart();`;
       <div className='flex-1 overflow-hidden'>
         <Conversation className="w-full h-full overflow-y-auto custom-scrollbar">
           <ConversationContent className="max-w-2xl mx-auto">
-            {messages.length === 0 ? (
+            {chatIds.length === 0 ? (
               <ConversationEmptyState
                 icon={<MessageSquare className="size-12" />}
                 title="No messages yet"
                 description="Start a conversation to see messages here. I can help you analyze Excel and PDF files, generate reports, and answer questions about your data."
               />
             ) : (
-              messages.map((message) => (
-                <ChatMessage
-                  key={message.id}
-                  message={message}
+              // Render memoized message items - only re-render when their specific chat ID updates
+              chatIds.map((chatId) => (
+                <ChatMessageItem
+                  key={chatId}
+                  chatId={chatId}
                   onCopy={handleCopy}
                   onRetry={handleRetry}
                   onLike={handleLike}
@@ -570,4 +279,5 @@ drawSignupsChart();`;
       )}
     </div>
   );
-};
+});
+

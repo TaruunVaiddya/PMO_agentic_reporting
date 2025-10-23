@@ -14,12 +14,15 @@ export default function Page() {
   const chatStore = useContext(ChatProviderContext);
 
   const handleSubmit = async (message: PromptInputMessage) => {
-    console.log('Message submitted:', message);
 
     if (!chatStore) {
       console.error('Chat store not available');
       return;
     }
+    message.text=message.text?.trim()
+    if(message.text == '')
+      return;
+    
 
     try {
       // Generate a unique session ID
@@ -33,7 +36,8 @@ export default function Page() {
         chatStore,
         input: message.text || '',
         sessionId,
-        selected_agent: selectedAgent
+        selected_agent: selectedAgent,
+        is_new_chat: true
       });
 
       // Start the chat and navigate to session page
@@ -67,11 +71,12 @@ export default function Page() {
         chatStore,
         input: suggestion,
         sessionId,
-        selected_agent: selectedAgent
+        selected_agent: selectedAgent,
+        is_new_chat: true
       });
 
-      // Start the chat and navigate to session page
-      await sseHandler.startChat();
+      // Start the chat and navigate to session page. Do NOT put await, else it will wait till request got over
+      sseHandler.startChat();
       
       // Navigate to the chat session page
       router.push(`/chat/${sessionId}`);
@@ -85,9 +90,6 @@ export default function Page() {
   useEffect(() => {
     if(chatStore) {
       chatStore.setChat({});
-    }
-    if(!localStorage.getItem('user')) {
-      router.push('/login');
     }
   }, []);
 

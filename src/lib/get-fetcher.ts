@@ -3,8 +3,10 @@ export const fetcher = async (path: string) => {
     try {
       response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
         method: "GET",
+        credentials: "include", // This should be at the top level, not in headers
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
         },
       })
     } catch (networkError) {
