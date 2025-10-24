@@ -4,23 +4,21 @@ import React from 'react';
 import { PanelLeftClose, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useSidebar } from '@/contexts/sidebar-context'
 
 interface SidebarToggleProps {
-  isCollapsed: boolean;
-  onToggle: () => void;
   className?: string;
 }
 
 export const SidebarToggle: React.FC<SidebarToggleProps> = ({
-  isCollapsed,
-  onToggle,
   className
 }) => {
+  const { isCollapsed, toggle } = useSidebar();
   return (
     <Button
       variant="ghost"
       size="icon"
-      onClick={onToggle}
+      onClick={()=>toggle}
       className={cn(
         'h-8 w-8 rounded-md hover:bg-accent transition-colors cursor-pointer',
         className

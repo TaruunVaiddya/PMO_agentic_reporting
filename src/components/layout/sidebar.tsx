@@ -1,7 +1,6 @@
-
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import {
   Plus,
@@ -17,22 +16,32 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { SearchModal } from './search-modal'
-import useSWR from 'swr'
-import { fetcher } from '@/lib/get-fetcher'
+import { useSession } from '@/contexts/session-context'
+import { useSidebar } from '@/contexts/sidebar-context'
+import { postFetcher } from '@/lib/post-fetcher'
 
 interface AppSidebarProps {
-  isCollapsed?: boolean;
+  sessions: any[];
+  error: any;
+  isLoading: boolean;
+  mutate: () => void;
 }
 
-export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
+export function AppSidebar({ 
+  sessions, 
+  error, 
+  isLoading, 
+  mutate 
+}: AppSidebarProps) {
   const router = useRouter()
+  const { isCollapsed, toggle } = useSidebar();
   const pathname = usePathname()
   const [favoritesExpanded, setFavoritesExpanded] = useState(false)
   const [recentChatsExpanded, setRecentChatsExpanded] = useState(true)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   
-  // Fetch dynamic sessions data using SWR
-  const { data: sessions = [], error, isLoading } = useSWR('/sessions', fetcher)
+  // Get session context for pending queries
+  const { pendingQuery, setPendingQuery, newSessionId, setNewSessionId } = useSession()
 
   const handleNewChat = () => {
     router.push('/chat')
@@ -50,7 +59,6 @@ export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
     router.push('/report-templates')
   }
 
-  const isInChatSession = pathname?.startsWith('/chat/') || false
 
   const navItems = [
     { icon: Plus, label: 'New Chat', active: pathname === '/chat', onClick: handleNewChat },
@@ -65,6 +73,38 @@ export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
   const handleChatClick = (sessionId: string) => {
     router.push(`/chat/${sessionId}`)
   }
+
+  // Handle pending query and create session with generated title
+  useEffect(() => {
+    if (pendingQuery && newSessionId.current) {
+      const createSessionWithTitle = async () => {
+        try {
+          console.log('Creating session with title:', pendingQuery);
+          console.log('Session ID:', newSessionId.current);
+          
+          // Call backend API to create session with generated title
+          const response = await postFetcher('/create-title', {
+            query: pendingQuery,
+            session_id: newSessionId.current
+          });
+          
+          console.log('Session created:', response);
+          
+          // Force immediate refresh of sessions list
+          mutate();
+          
+        } catch (error) {
+          console.error('Error creating session:', error);
+        } finally {
+          // Clear the context after processing
+          setPendingQuery(null);
+          setNewSessionId(null);
+        }
+      };
+
+      createSessionWithTitle();
+    }
+  }, [pendingQuery]);
 
   return (
     <div className={cn(
@@ -192,7 +232,13 @@ export function AppSidebar({ isCollapsed = false }: AppSidebarProps) {
         </>
       )}
 
-      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <SearchModal 
+        isOpen={isSearchOpen} 
+        onClose={() => setIsSearchOpen(false)}
+        sessions={sessions}
+        error={error}
+        isLoading={isLoading}
+      />
     </div>
   )
 }

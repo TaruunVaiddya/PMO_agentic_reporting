@@ -6,12 +6,14 @@ import { ChatInput } from '@/components/chat/chat-input';
 import { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import { ArrowRight, TrendingUp, PieChart, BarChart3, Calendar } from 'lucide-react';
 import { ChatProviderContext } from '@/contexts/chat-provider';
+import { useSession } from '@/contexts/session-context';
 import SSEChatHandler from '@/services/chat-service';
 import generateUniqueId from '@/lib/get_unique_id';
 
 export default function Page() {
   const router = useRouter();
   const chatStore = useContext(ChatProviderContext);
+  const { setPendingQuery, setNewSessionId } = useSession();
 
   const handleSubmit = async (message: PromptInputMessage) => {
 
@@ -42,6 +44,9 @@ export default function Page() {
 
       // Start the chat and navigate to session page
       sseHandler.startChat();
+
+      setNewSessionId(sessionId);
+      setPendingQuery(message.text || '');
       
       // Navigate to the chat session page
       router.push(`/chat/${sessionId}?chat=new`);

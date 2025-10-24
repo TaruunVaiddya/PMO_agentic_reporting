@@ -4,20 +4,19 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Plus, Layers, FileText, MessageSquare, X, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import useSWR from 'swr'
-import { fetcher } from '@/lib/get-fetcher'
+// Removed SWR imports - will receive data as props
 
 interface SearchModalProps {
   isOpen: boolean
   onClose: () => void
+  sessions: any[]
+  error: any
+  isLoading: boolean
 }
 
-export function SearchModal({ isOpen, onClose }: SearchModalProps) {
+export function SearchModal({ isOpen, onClose, sessions, error, isLoading }: SearchModalProps) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
-  
-  // Fetch dynamic sessions data using SWR
-  const { data: sessions = [], error, isLoading } = useSWR('/sessions', fetcher)
 
   const filteredChats = sessions.filter(session =>
     session.title.toLowerCase().includes(searchQuery.toLowerCase())

@@ -3,6 +3,7 @@ export const postFetcher = async (path: string, data: any) => {
     try {
       response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
         method: "POST",
+        credentials:'include',
         headers: {
           "Content-Type": "application/json",
         },
