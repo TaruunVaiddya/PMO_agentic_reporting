@@ -54,6 +54,7 @@ const ChatMessageItem = React.memo(({
       let content = '';
       let reasoning = undefined;
       let reasoningDuration = undefined;
+      let reasoningStreaming = false;
       let tasks = undefined;
       let toolCalls = undefined;
       
@@ -62,6 +63,13 @@ const ChatMessageItem = React.memo(({
         // Still streaming or just completed but content is still string
         content = assistantMsg.content;
         isStreaming = chatItem.status !== 'Completed';
+        
+        // Extract reasoning from the message structure during streaming
+        if ((assistantMsg as any).reasoning) {
+          reasoning = (assistantMsg as any).reasoning.content;
+          reasoningDuration = (assistantMsg as any).reasoning.duration;
+          reasoningStreaming = !(assistantMsg as any).reasoning.complete;
+        }
       } else if (Array.isArray(assistantMsg.content)) {
         // Complete - process ContentEvent array
         const events = assistantMsg.content as ContentEvent[];
@@ -126,6 +134,7 @@ const ChatMessageItem = React.memo(({
         timestamp: new Date(),
         reasoning,
         reasoningDuration,
+        reasoningStreaming,
         isStreaming,
         tasks,
         toolCalls,
@@ -149,6 +158,7 @@ const ChatMessageItem = React.memo(({
           onLike={onLike}
           onDislike={onDislike}
           onPreviewClick={onPreviewClick}
+          status={chatItem?.status}
         />
       ))}
     </>

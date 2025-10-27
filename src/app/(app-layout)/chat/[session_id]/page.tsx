@@ -60,7 +60,6 @@ export default function Page({ params }: ChatSessionPageProps) {
               created_at: new Date(chat.created_at),
             };
           });
-          console.log("appeend chat list=============================");
           if (chatStore?.checkIfOnlyOneChat()) {
             chatStore?.setChat({ ...chatStore?.getChatList(), ...chatList });
           } else {
@@ -187,7 +186,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
     <>
       <div className='flex-1 overflow-hidden'>
         <Conversation className="w-full h-full overflow-y-auto custom-scrollbar">
-          <ConversationContent className="max-w-2xl mx-auto">
+          <ConversationContent className="max-w-3xl mx-auto">
             {chatIds.length === 0 ? (
               <ConversationEmptyState
                 icon={<MessageSquare className="size-12" />}

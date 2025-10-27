@@ -11,6 +11,9 @@ export interface ChatServiceConfig {
 export default class SSEChatHandler {
     private chatId: string | null = null;
     private chunks: string[] = [];
+    private reasoningChunks: string[] = [];
+    private isReasoningComplete = false;
+    private reasoningDuration?: number;
     private updateInterval: NodeJS.Timeout | null = null;
     private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
     private decoder = new TextDecoder();
@@ -81,23 +84,40 @@ export default class SSEChatHandler {
   
     private scheduleChunkProcessing(): void {
       const processChunks = () => {
-        if (this.chatId && this.chunks.length > 0) {
-          // Batch process chunks for better performance
-          const newContent = this.chunks.join('');
-          const previousContent = this.chatStore?.getChat(this.chatId)?.assistantMessage?.content || '';
+        if (this.chatId && (this.chunks.length > 0 || this.reasoningChunks.length > 0)) {
+          // Batch process both reasoning and content chunks
+          const previousMessage = this.chatStore?.getChat(this.chatId)?.assistantMessage || {};
           
-          this.chatStore?.addChat({
+          const newReasoningContent = this.reasoningChunks.join('');
+          const previousReasoningContent = previousMessage.reasoning?.content || '';
+          
+          const newContent = this.chunks.join('');
+          const previousContent = previousMessage.content || '';
+          
+          const updatedMessage: any = {
             id: this.chatId,
             content: previousContent + newContent,
             role: 'assistant',
-          }, this.chatId, 'assistant');
+          };
           
+          // Add reasoning if exists
+          if (previousReasoningContent || newReasoningContent) {
+            updatedMessage.reasoning = {
+              content: previousReasoningContent + newReasoningContent,
+              complete: this.isReasoningComplete,
+              ...(this.reasoningDuration !== undefined && { duration: this.reasoningDuration })
+            };
+          }
+          
+          this.chatStore?.addChat(updatedMessage, this.chatId, 'assistant');
+          
+          this.reasoningChunks.length = 0;
           this.chunks.length = 0; 
         }
   
         // Continue scheduling if chat is active
         if (this.chatId && !this.abortController.signal.aborted) {
-          this.updateInterval = setTimeout(processChunks, 300); 
+          this.updateInterval = setTimeout(processChunks, 200); 
         }
       };
   
@@ -159,6 +179,23 @@ export default class SSEChatHandler {
           }
           break;
   
+        case 'reasoning':
+          try {
+            const reasoningData = JSON.parse(data);
+            if (reasoningData.delta) {
+              this.reasoningChunks.push(reasoningData.delta);
+            }
+            if (reasoningData.complete) {
+              this.isReasoningComplete = true;
+              if (reasoningData.duration !== undefined) {
+                this.reasoningDuration = reasoningData.duration;
+              }
+            }
+          } catch (parseError) {
+            console.warn('Invalid reasoning data:', data);
+          }
+          break;
+  
         case 'delta':
           try {
             const deltaData = JSON.parse(data);
@@ -192,16 +229,33 @@ export default class SSEChatHandler {
     }
   
     private processRemainingChunks(): void {
-      if (this.chatId && this.chunks.length > 0) {
-        const newContent = this.chunks.join('');
-        const previousContent = this.chatStore?.getChat(this.chatId)?.assistantMessage?.content || '';
+      if (this.chatId && (this.chunks.length > 0 || this.reasoningChunks.length > 0)) {
+        const previousMessage = this.chatStore?.getChat(this.chatId)?.assistantMessage || {};
         
-        this.chatStore?.addChat({
+        const newReasoningContent = this.reasoningChunks.join('');
+        const previousReasoningContent = previousMessage.reasoning?.content || '';
+        
+        const newContent = this.chunks.join('');
+        const previousContent = previousMessage.content || '';
+        
+        const updatedMessage: any = {
           id: this.chatId,
           content: previousContent + newContent,
           role: 'assistant',
-        }, this.chatId, 'assistant');
+        };
         
+        // Add reasoning if exists
+        if (previousReasoningContent || newReasoningContent) {
+          updatedMessage.reasoning = {
+            content: previousReasoningContent + newReasoningContent,
+            complete: this.isReasoningComplete,
+            ...(this.reasoningDuration !== undefined && { duration: this.reasoningDuration })
+          };
+        }
+        
+        this.chatStore?.addChat(updatedMessage, this.chatId, 'assistant');
+        
+        this.reasoningChunks.length = 0;
         this.chunks.length = 0;
       }
     }

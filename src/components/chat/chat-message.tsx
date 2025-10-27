@@ -23,6 +23,7 @@ import {
 import { Copy, RefreshCw, ThumbsUp, ThumbsDown, Monitor, WrenchIcon, CircleIcon, ClockIcon, CheckCircleIcon, XCircleIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ChatStatus } from '@/types/chat';
 
 // Use types from our centralized chat types
 export interface TaskData {
@@ -52,6 +53,7 @@ export interface ChatMessageData {
   reasoning?: string;
   isStreaming?: boolean;
   reasoningDuration?: number;
+  reasoningStreaming?: boolean;
   tasks?: TaskData[];
   toolCalls?: ToolCallData[];
 }
@@ -63,6 +65,7 @@ interface ChatMessageProps {
   onLike: (messageId: string) => void;
   onDislike: (messageId: string) => void;
   onPreviewClick?: (toolCall: ToolCallData) => void;
+  status?: ChatStatus
 }
 
 export const ChatMessage = React.memo(({
@@ -71,7 +74,8 @@ export const ChatMessage = React.memo(({
   onRetry,
   onLike,
   onDislike,
-  onPreviewClick
+  onPreviewClick,
+  status
 }: ChatMessageProps) => {
   const isUser = message.sender === 'user';
   const isAssistant = message.sender === 'assistant';
@@ -79,19 +83,20 @@ export const ChatMessage = React.memo(({
   return (
     <Message
       from={message.sender}
-      className="group/message"
+      className="group/message w-full"
     >
       <div className={cn(
-        "flex flex-col gap-2 w-full",
+        "w-full flex flex-col gap-2 w-full",
         isUser ? 'items-end' : 'items-start'
       )}>
         {/* Show reasoning for assistant messages if available */}
         {isAssistant && message.reasoning && (
-          <div className="w-full max-w-2xl">
+          <div className="w-full">
             <Reasoning
-              isStreaming={message.isStreaming}
+              isStreaming={message.reasoningStreaming?true:false}
               duration={message.reasoningDuration}
               className="mb-3"
+              defaultOpen={status!='Completed'}
             >
               <ReasoningTrigger />
               <ReasoningContent>{message.reasoning}</ReasoningContent>
@@ -101,7 +106,7 @@ export const ChatMessage = React.memo(({
 
         {/* Show tasks for assistant messages if available */}
         {isAssistant && message.tasks && message.tasks.length > 0 && (
-          <div className="w-full max-w-2xl mb-3">
+          <div className="w-full mb-3">
             <Task>
               <TaskTrigger
                 title="Agent Tasks"
@@ -208,7 +213,7 @@ export const ChatMessage = React.memo(({
           data-user={isUser}
         >
           {isAssistant ? (
-            <Response>{message.content}</Response>
+            <Response className='w-full'>{message.content}</Response>
           ) : (
             <div className="w-full">
               {message.content}
