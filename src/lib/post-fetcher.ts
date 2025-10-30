@@ -17,7 +17,18 @@ export const postFetcher = async (path: string, data: any) => {
   
     if (!response.ok) {
       const bodyText = await response.json()
-      throw new Error(bodyText?.detail || "Request failed")
+      // Handle structured error objects from backend
+      const detail = bodyText?.detail
+      let errorMessage = "Request failed"
+
+      if (typeof detail === 'object' && detail !== null) {
+        // Backend returns { error: "message", code: "ERROR_CODE" }
+        errorMessage = detail.error || detail.message || JSON.stringify(detail)
+      } else if (typeof detail === 'string') {
+        errorMessage = detail
+      }
+
+      throw new Error(errorMessage)
     }
   
     try {

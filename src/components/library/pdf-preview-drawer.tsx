@@ -4,6 +4,10 @@ import { useState, useEffect } from 'react'
 import { X, Download, FileText, Calendar, HardDrive, Maximize2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Loader2, AlertCircle, Edit2, Save, XCircle } from 'lucide-react'
 import { formatFileSize, formatRelativeTime } from '@/lib/excel-utils'
 import { motion, AnimatePresence } from 'motion/react'
+import { fetcher } from '@/lib/get-fetcher'
+import { toast } from 'sonner'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface PdfPreviewDrawerProps {
   isOpen: boolean
@@ -17,53 +21,102 @@ interface PdfPreviewDrawerProps {
     document_size: number
     upload_date: string
     user_suggestion?: string | null
-    pdf_url?: string
-    total_pages?: number
-    extracted_text?: string
-    summary?: string
   } | null
+}
+
+interface PdfDetails {
+  id: string
+  document_id: string
+  document_url: string
+  extracted_text: any | null
+  pages_processed: number
+  ai_summary: Array<{ header: string; summary: string }> | null
+  created_at: string
 }
 
 export function PdfPreviewDrawer({ isOpen, onClose, document }: PdfPreviewDrawerProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [zoomLevel, setZoomLevel] = useState(100)
-  const [isLoading, setIsLoading] = useState(true)
-  const [hasError, setHasError] = useState(false)
   const [activeTab, setActiveTab] = useState<'preview' | 'text' | 'summary'>('preview')
-  const [isEditingKeyPoints, setIsEditingKeyPoints] = useState(false)
-  const [isEditingSummary, setIsEditingSummary] = useState(false)
-  const [isEditingActions, setIsEditingActions] = useState(false)
-  const [editableKeyPoints, setEditableKeyPoints] = useState('')
-  const [editableSummary, setEditableSummary] = useState('')
-  const [editableActions, setEditableActions] = useState('')
+
+  // API data state
+  const [pdfDetails, setPdfDetails] = useState<PdfDetails | null>(null)
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false)
+  const [detailsError, setDetailsError] = useState<string | null>(null)
+
+  // PDF loading state
+  const [isPdfLoading, setIsPdfLoading] = useState(true)
+  const [pdfError, setPdfError] = useState(false)
+
+  // Edit states for summary sections
+  const [editingSections, setEditingSections] = useState<Record<string, boolean>>({})
+  const [editedSummaries, setEditedSummaries] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && document) {
       setCurrentPage(1)
       setZoomLevel(100)
-      setIsLoading(true)
-      setHasError(false)
       setActiveTab('preview')
+      setPdfDetails(null)
+      setDetailsError(null)
+      setEditingSections({})
+      setEditedSummaries({})
+      setIsPdfLoading(true)
+      setPdfError(false)
 
-      // Initialize editable content
-      setEditableKeyPoints('Financial performance exceeded expectations with 15% YoY growth\nMarket expansion into three new regions completed successfully\nProduct innovation pipeline shows strong potential for Q4')
-      setEditableSummary(document?.summary || 'This document presents a comprehensive overview of the quarterly business performance and strategic initiatives. The report highlights significant achievements in revenue growth, operational efficiency improvements, and successful market penetration strategies. Key recommendations include continued investment in digital transformation and expansion of the product portfolio to maintain competitive advantage.')
-      setEditableActions('Review budget allocation for Q4 initiatives\nSchedule stakeholder meetings for strategy alignment\nPrepare detailed implementation roadmap')
-
-      setIsEditingKeyPoints(false)
-      setIsEditingSummary(false)
-      setIsEditingActions(false)
-
-      // Simulate loading PDF
-      setTimeout(() => {
-        setIsLoading(false)
-      }, 1500)
+      // Fetch PDF details from API
+      fetchPdfDetails()
     }
   }, [isOpen, document])
 
+  const fetchPdfDetails = async () => {
+    if (!document) return
+
+    setIsLoadingDetails(true)
+    setDetailsError(null)
+    setIsPdfLoading(true)
+    setPdfError(false)
+
+    try {
+      const response = await fetcher(`/documents/${document.document_id}/pdf-details`)
+      // pdf_details is an array, get the first element
+      const pdfDetailsData = Array.isArray(response.pdf_details)
+        ? response.pdf_details[0]
+        : response.pdf_details
+      setPdfDetails(pdfDetailsData)
+
+      // Initialize edited summaries with API data
+      if (pdfDetailsData.ai_summary) {
+        const initialSummaries: Record<string, string> = {}
+        pdfDetailsData.ai_summary.forEach((item: { header: string; summary: string }) => {
+          initialSummaries[item.header] = item.summary
+        })
+        setEditedSummaries(initialSummaries)
+      }
+
+      // For PDFs, iframe onLoad is unreliable, so we hide loading after a short delay
+      // once we have the URL
+      if (pdfDetailsData.document_url) {
+        setTimeout(() => {
+          setIsPdfLoading(false)
+        }, 1000)
+      } else {
+        setIsPdfLoading(false)
+      }
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Failed to load PDF details'
+      setDetailsError(errorMessage)
+      setPdfError(true)
+      setIsPdfLoading(false)
+      toast.error(errorMessage)
+    } finally {
+      setIsLoadingDetails(false)
+    }
+  }
+
   if (!document || !isOpen) return null
 
-  const totalPages = document.total_pages || 10 // Mock value
+  const totalPages = pdfDetails?.pages_processed || 1
 
   const handleZoomIn = () => {
     setZoomLevel(prev => Math.min(prev + 25, 200))
@@ -82,8 +135,11 @@ export function PdfPreviewDrawer({ isOpen, onClose, document }: PdfPreviewDrawer
   }
 
   const handleDownload = () => {
-    // Implement download logic
-    console.log('Downloading PDF:', document.document_name)
+    if (pdfDetails?.document_url) {
+      window.open(pdfDetails.document_url, '_blank')
+    } else {
+      toast.error('PDF URL not available')
+    }
   }
 
   return (
@@ -185,28 +241,16 @@ export function PdfPreviewDrawer({ isOpen, onClose, document }: PdfPreviewDrawer
               </button>
             </div>
 
-            {/* PDF Controls - Only show when in preview tab */}
-            {activeTab === 'preview' && (
+            {/* PDF Controls - Only show when in preview tab and PDF is loaded */}
+            {activeTab === 'preview' && pdfDetails && (
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={handlePrevPage}
-                    disabled={currentPage === 1}
-                    className="p-1 hover:bg-white/10 rounded transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 hover:border-white/20"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5 text-white/60" />
-                  </button>
-                  <span className="text-xs text-white/80 font-medium">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={handleNextPage}
-                    disabled={currentPage === totalPages}
-                    className="p-1 hover:bg-white/10 rounded transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 hover:border-white/20"
-                  >
-                    <ChevronRight className="w-3.5 h-3.5 text-white/60" />
-                  </button>
-                </div>
+                {pdfDetails.pages_processed > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-white/80 font-medium">
+                      {pdfDetails.pages_processed} {pdfDetails.pages_processed === 1 ? 'page' : 'pages'}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-1.5">
                   <button
@@ -240,71 +284,196 @@ export function PdfPreviewDrawer({ isOpen, onClose, document }: PdfPreviewDrawer
           {/* Content Area */}
           <div className="flex-1 overflow-hidden">
             {activeTab === 'preview' && (
-              <div className="h-full overflow-auto bg-black/10 p-4 relative z-10">
-                  <div className="flex items-center justify-center min-h-full">
-                    {isLoading ? (
-                      <div className="flex flex-col items-center gap-3">
-                        <Loader2 className="w-8 h-8 text-white/60 animate-spin" />
-                        <p className="text-sm text-white/60">Loading PDF...</p>
-                      </div>
-                    ) : hasError ? (
-                      <div className="flex flex-col items-center gap-3">
-                        <AlertCircle className="w-8 h-8 text-red-400" />
-                        <p className="text-sm text-white/60">Failed to load PDF</p>
-                        <button
-                          onClick={() => {
-                            setIsLoading(true)
-                            setHasError(false)
-                            setTimeout(() => {
-                              setIsLoading(false)
-                            }, 1500)
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 bg-black/20 hover:bg-black/30 rounded-lg transition-all duration-200 border border-white/20 hover:border-white/30 text-white/80"
-                        >
-                          <RotateCw className="w-4 h-4" />
-                          <span className="text-sm">Retry</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div
-                        className="bg-white rounded-lg shadow-2xl transition-transform my-4"
-                        style={{
-                          width: '612px',
-                          height: '792px',
-                          transform: `scale(${zoomLevel / 100})`,
-                          transformOrigin: 'center'
-                        }}
+              <div className="h-full overflow-auto bg-black/10 relative z-10">
+                {isLoadingDetails || isPdfLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="w-8 h-8 text-white/60 animate-spin" />
+                      <p className="text-sm text-white/60">
+                        {isLoadingDetails ? 'Loading PDF details...' : 'Loading PDF preview...'}
+                      </p>
+                    </div>
+                  </div>
+                ) : pdfError || detailsError ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="flex flex-col items-center gap-3">
+                      <AlertCircle className="w-8 h-8 text-red-400" />
+                      <p className="text-sm text-white/60">{detailsError || 'Failed to load PDF'}</p>
+                      <button
+                        onClick={fetchPdfDetails}
+                        className="flex items-center gap-2 px-4 py-2 bg-black/20 hover:bg-black/30 rounded-lg transition-all duration-200 border border-white/20 hover:border-white/30 text-white/80"
                       >
-                        <div className="p-8 text-gray-800">
-                          <h1 className="text-2xl font-bold mb-4">PDF Page {currentPage}</h1>
-                          <p className="mb-4">This is a mock PDF preview. In a real implementation, you would use a library like react-pdf or pdf.js to render actual PDF content.</p>
-                          <p className="text-gray-600">Document: {document.document_name}</p>
-                          <div className="mt-8 space-y-2">
-                            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                            <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-                            <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
-                          </div>
+                        <RotateCw className="w-4 h-4" />
+                        <span className="text-sm">Retry</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : !pdfDetails?.document_url ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="flex flex-col items-center gap-3">
+                      <AlertCircle className="w-8 h-8 text-yellow-400" />
+                      <p className="text-sm text-white/60">PDF URL not available</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full w-full relative">
+                    {isPdfLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+                        <div className="flex flex-col items-center gap-3">
+                          <Loader2 className="w-8 h-8 text-white/60 animate-spin" />
+                          <p className="text-sm text-white/60">Loading PDF preview...</p>
                         </div>
                       </div>
                     )}
+                    <iframe
+                      src={`${pdfDetails.document_url}#navpanes=0&scrollbar=1`}
+                      className="w-full h-full border-0"
+                      title={document.document_name}
+                      style={{
+                        transform: `scale(${zoomLevel / 100})`,
+                        transformOrigin: 'top center',
+                        height: `${(100 / zoomLevel) * 100}%`
+                      }}
+                    />
                   </div>
+                )}
               </div>
             )}
 
             {activeTab === 'text' && (
               <div className="h-full overflow-auto p-6 relative z-10">
-                <div className="prose prose-invert max-w-none">
+                <div className="max-w-none">
                   <h3 className="text-lg font-semibold text-white/90 mb-4">Extracted Text</h3>
-                  <div className="bg-black/30 rounded-lg p-4 border border-white/20">
-                    <p className="text-sm text-white/70 leading-relaxed">
-                      {document.extracted_text ||
-                        `This is sample extracted text from ${document.document_name}. In a real implementation, this would show the actual text content extracted from the PDF using OCR or text extraction tools.
+                  {isLoadingDetails ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 text-white/60 animate-spin mb-3" />
+                      <p className="text-sm text-white/60">Loading extracted text...</p>
+                    </div>
+                  ) : detailsError ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <AlertCircle className="w-8 h-8 text-red-400 mb-3" />
+                      <p className="text-sm text-white/60 mb-4">{detailsError}</p>
+                      <button
+                        onClick={fetchPdfDetails}
+                        className="flex items-center gap-2 px-4 py-2 bg-black/20 hover:bg-black/30 rounded-lg transition-all duration-200 border border-white/20 hover:border-white/30 text-white/80"
+                      >
+                        <RotateCw className="w-4 h-4" />
+                        <span className="text-sm">Retry</span>
+                      </button>
+                    </div>
+                  ) : !pdfDetails?.extracted_text ? (
+                    <div className="bg-black/30 rounded-lg p-8 border border-white/20 text-center">
+                      <p className="text-sm text-white/60">No extracted text available for this document.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Check if extracted_text is an array of pages */}
+                      {Array.isArray(pdfDetails.extracted_text) ? (
+                        pdfDetails.extracted_text.map((page: any, index: number) => (
+                          <div key={index} className="bg-black/30 rounded-lg border border-white/20 overflow-hidden">
+                            {/* Page Number Badge */}
+                            <div className="bg-black/40 px-4 py-2 border-b border-white/10">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded bg-white/10 flex items-center justify-center border border-white/20">
+                                  <FileText className="w-3.5 h-3.5 text-white/60" />
+                                </div>
+                                <span className="text-xs font-medium text-white/70">
+                                  Page {page.page_number || index + 1}
+                                </span>
+                              </div>
+                            </div>
 
-                        The extracted text would preserve formatting and structure as much as possible, making it easy to read and search through the document content without needing to view the PDF itself.
-
-                        Key sections and paragraphs would be preserved, allowing users to quickly scan through the document content and find relevant information.`}
-                    </p>
-                  </div>
+                            {/* Markdown Content */}
+                            <div className="p-5">
+                              <div className="prose prose-invert prose-sm max-w-none">
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm]}
+                                  components={{
+                                    // Headings
+                                    h1: ({ node, ...props }) => (
+                                      <h1 className="text-xl font-bold text-white/90 mb-3 mt-4 first:mt-0" {...props} />
+                                    ),
+                                    h2: ({ node, ...props }) => (
+                                      <h2 className="text-lg font-bold text-white/85 mb-2.5 mt-3.5 first:mt-0" {...props} />
+                                    ),
+                                    h3: ({ node, ...props }) => (
+                                      <h3 className="text-base font-semibold text-white/80 mb-2 mt-3 first:mt-0" {...props} />
+                                    ),
+                                    h4: ({ node, ...props }) => (
+                                      <h4 className="text-sm font-semibold text-white/75 mb-1.5 mt-2.5 first:mt-0" {...props} />
+                                    ),
+                                    // Paragraphs
+                                    p: ({ node, ...props }) => (
+                                      <p className="text-sm text-white/70 leading-relaxed mb-3" {...props} />
+                                    ),
+                                    // Lists
+                                    ul: ({ node, ...props }) => (
+                                      <ul className="list-disc list-inside space-y-1 mb-3 text-sm text-white/70" {...props} />
+                                    ),
+                                    ol: ({ node, ...props }) => (
+                                      <ol className="list-decimal list-inside space-y-1 mb-3 text-sm text-white/70" {...props} />
+                                    ),
+                                    li: ({ node, ...props }) => (
+                                      <li className="text-white/70 leading-relaxed ml-2" {...props} />
+                                    ),
+                                    // Strong/Bold
+                                    strong: ({ node, ...props }) => (
+                                      <strong className="font-semibold text-white/85" {...props} />
+                                    ),
+                                    // Code
+                                    code: ({ node, inline, ...props }: any) =>
+                                      inline ? (
+                                        <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs text-white/80 border border-white/20" {...props} />
+                                      ) : (
+                                        <code className="block bg-white/10 p-3 rounded-lg text-xs text-white/80 border border-white/20 overflow-x-auto" {...props} />
+                                      ),
+                                    // Links
+                                    a: ({ node, ...props }) => (
+                                      <a className="text-blue-400 hover:text-blue-300 underline" {...props} />
+                                    ),
+                                    // Blockquotes
+                                    blockquote: ({ node, ...props }) => (
+                                      <blockquote className="border-l-4 border-white/20 pl-4 italic text-white/60 my-3" {...props} />
+                                    ),
+                                    // Horizontal Rule
+                                    hr: ({ node, ...props }) => (
+                                      <hr className="border-white/10 my-4" {...props} />
+                                    ),
+                                    // Tables
+                                    table: ({ node, ...props }) => (
+                                      <div className="overflow-x-auto mb-4">
+                                        <table className="min-w-full border border-white/20 rounded-lg" {...props} />
+                                      </div>
+                                    ),
+                                    thead: ({ node, ...props }) => (
+                                      <thead className="bg-white/5 border-b border-white/20" {...props} />
+                                    ),
+                                    th: ({ node, ...props }) => (
+                                      <th className="px-4 py-2 text-left text-xs font-semibold text-white/80 border-r border-white/10 last:border-r-0" {...props} />
+                                    ),
+                                    td: ({ node, ...props }) => (
+                                      <td className="px-4 py-2 text-sm text-white/70 border-r border-white/10 last:border-r-0 border-b border-white/10" {...props} />
+                                    ),
+                                  }}
+                                >
+                                  {page.elements}
+                                </ReactMarkdown>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        // Fallback for non-array format
+                        <div className="bg-black/30 rounded-lg p-4 border border-white/20">
+                          <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">
+                            {typeof pdfDetails.extracted_text === 'string'
+                              ? pdfDetails.extracted_text
+                              : JSON.stringify(pdfDetails.extracted_text, null, 2)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -313,164 +482,104 @@ export function PdfPreviewDrawer({ isOpen, onClose, document }: PdfPreviewDrawer
               <div className="h-full overflow-auto p-6 relative z-10">
                 <div className="prose prose-invert max-w-none">
                   <h3 className="text-lg font-semibold text-white/90 mb-4">AI-Generated Summary</h3>
-                  <div className="space-y-4">
-                    {/* Key Points Section */}
-                    <div className="bg-black/30 rounded-lg p-4 border border-white/20">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-semibold text-white/80">Key Points</h4>
-                        <button
-                          onClick={() => {
-                            if (isEditingKeyPoints) {
-                              setIsEditingKeyPoints(false)
-                            } else {
-                              setIsEditingKeyPoints(true)
-                            }
-                          }}
-                          className="p-1 hover:bg-white/10 rounded transition-colors text-white/60 hover:text-white/80"
-                          title={isEditingKeyPoints ? 'Cancel edit' : 'Edit key points'}
-                        >
-                          {isEditingKeyPoints ? <XCircle className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      {isEditingKeyPoints ? (
-                        <div className="space-y-2">
-                          <textarea
-                            value={editableKeyPoints}
-                            onChange={(e) => setEditableKeyPoints(e.target.value)}
-                            className="w-full p-3 bg-black/40 border border-white/20 rounded-lg text-sm text-white/80 placeholder-white/30 focus:outline-none focus:border-white/40 resize-none"
-                            rows={4}
-                            placeholder="Enter key points, one per line..."
-                          />
-                          <div className="flex justify-end gap-2">
+                  {isLoadingDetails ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 text-white/60 animate-spin mb-3" />
+                      <p className="text-sm text-white/60">Loading AI summary...</p>
+                    </div>
+                  ) : detailsError ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <AlertCircle className="w-8 h-8 text-red-400 mb-3" />
+                      <p className="text-sm text-white/60 mb-4">{detailsError}</p>
+                      <button
+                        onClick={fetchPdfDetails}
+                        className="flex items-center gap-2 px-4 py-2 bg-black/20 hover:bg-black/30 rounded-lg transition-all duration-200 border border-white/20 hover:border-white/30 text-white/80"
+                      >
+                        <RotateCw className="w-4 h-4" />
+                        <span className="text-sm">Retry</span>
+                      </button>
+                    </div>
+                  ) : !pdfDetails?.ai_summary || pdfDetails.ai_summary.length === 0 ? (
+                    <div className="bg-black/30 rounded-lg p-8 border border-white/20 text-center">
+                      <p className="text-sm text-white/60">No AI summary available for this document.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {pdfDetails.ai_summary.map((section, index) => (
+                        <div key={index} className="bg-black/30 rounded-lg p-4 border border-white/20">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-white/80">{section.header}</h4>
                             <button
-                              onClick={() => setIsEditingKeyPoints(false)}
-                              className="px-3 py-1 text-xs text-white/60 hover:text-white/80 transition-colors"
+                              onClick={() => {
+                                setEditingSections(prev => ({
+                                  ...prev,
+                                  [section.header]: !prev[section.header]
+                                }))
+                              }}
+                              className="p-1 hover:bg-white/10 rounded transition-colors text-white/60 hover:text-white/80"
+                              title={editingSections[section.header] ? 'Cancel edit' : `Edit ${section.header}`}
                             >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={() => setIsEditingKeyPoints(false)}
-                              className="flex items-center gap-1 px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-white/80 transition-colors"
-                            >
-                              <Save className="w-3 h-3" />
-                              Save
+                              {editingSections[section.header] ? (
+                                <XCircle className="w-4 h-4" />
+                              ) : (
+                                <Edit2 className="w-4 h-4" />
+                              )}
                             </button>
                           </div>
+                          {editingSections[section.header] ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editedSummaries[section.header] || section.summary}
+                                onChange={(e) => {
+                                  setEditedSummaries(prev => ({
+                                    ...prev,
+                                    [section.header]: e.target.value
+                                  }))
+                                }}
+                                className="w-full p-3 bg-black/40 border border-white/20 rounded-lg text-sm text-white/80 placeholder-white/30 focus:outline-none focus:border-white/40 resize-none"
+                                rows={6}
+                                placeholder={`Enter ${section.header.toLowerCase()}...`}
+                              />
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => {
+                                    setEditingSections(prev => ({
+                                      ...prev,
+                                      [section.header]: false
+                                    }))
+                                    setEditedSummaries(prev => ({
+                                      ...prev,
+                                      [section.header]: section.summary
+                                    }))
+                                  }}
+                                  className="px-3 py-1 text-xs text-white/60 hover:text-white/80 transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingSections(prev => ({
+                                      ...prev,
+                                      [section.header]: false
+                                    }))
+                                    toast.success('Changes saved')
+                                  }}
+                                  className="flex items-center gap-1 px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-white/80 transition-colors"
+                                >
+                                  <Save className="w-3 h-3" />
+                                  Save
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">
+                              {editedSummaries[section.header] || section.summary}
+                            </p>
+                          )}
                         </div>
-                      ) : (
-                        <ul className="space-y-2 text-sm text-white/70">
-                          {editableKeyPoints.split('\\n').map((point, index) => (
-                            <li key={index} className="flex items-start gap-2">
-                              <span className="text-white/60 mt-1">•</span>
-                              <span>{point}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                      ))}
                     </div>
-
-                    {/* Executive Summary Section */}
-                    <div className="bg-black/30 rounded-lg p-4 border border-white/20">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-semibold text-white/80">Executive Summary</h4>
-                        <button
-                          onClick={() => {
-                            if (isEditingSummary) {
-                              setIsEditingSummary(false)
-                            } else {
-                              setIsEditingSummary(true)
-                            }
-                          }}
-                          className="p-1 hover:bg-white/10 rounded transition-colors text-white/60 hover:text-white/80"
-                          title={isEditingSummary ? 'Cancel edit' : 'Edit summary'}
-                        >
-                          {isEditingSummary ? <XCircle className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      {isEditingSummary ? (
-                        <div className="space-y-2">
-                          <textarea
-                            value={editableSummary}
-                            onChange={(e) => setEditableSummary(e.target.value)}
-                            className="w-full p-3 bg-black/40 border border-white/20 rounded-lg text-sm text-white/80 placeholder-white/30 focus:outline-none focus:border-white/40 resize-none"
-                            rows={6}
-                            placeholder="Enter executive summary..."
-                          />
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => setIsEditingSummary(false)}
-                              className="px-3 py-1 text-xs text-white/60 hover:text-white/80 transition-colors"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={() => setIsEditingSummary(false)}
-                              className="flex items-center gap-1 px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-white/80 transition-colors"
-                            >
-                              <Save className="w-3 h-3" />
-                              Save
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-white/60 leading-relaxed">
-                          {editableSummary}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Action Items Section */}
-                    <div className="bg-black/30 rounded-lg p-4 border border-white/20">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-semibold text-white/80">Action Items</h4>
-                        <button
-                          onClick={() => {
-                            if (isEditingActions) {
-                              setIsEditingActions(false)
-                            } else {
-                              setIsEditingActions(true)
-                            }
-                          }}
-                          className="p-1 hover:bg-white/10 rounded transition-colors text-white/60 hover:text-white/80"
-                          title={isEditingActions ? 'Cancel edit' : 'Edit action items'}
-                        >
-                          {isEditingActions ? <XCircle className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      {isEditingActions ? (
-                        <div className="space-y-2">
-                          <textarea
-                            value={editableActions}
-                            onChange={(e) => setEditableActions(e.target.value)}
-                            className="w-full p-3 bg-black/40 border border-white/20 rounded-lg text-sm text-white/80 placeholder-white/30 focus:outline-none focus:border-white/40 resize-none"
-                            rows={4}
-                            placeholder="Enter action items, one per line..."
-                          />
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => setIsEditingActions(false)}
-                              className="px-3 py-1 text-xs text-white/60 hover:text-white/80 transition-colors"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={() => setIsEditingActions(false)}
-                              className="flex items-center gap-1 px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-white/80 transition-colors"
-                            >
-                              <Save className="w-3 h-3" />
-                              Save
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <ul className="space-y-1 text-sm text-white/60">
-                          {editableActions.split('\\n').map((action, index) => (
-                            <li key={index}>• {action}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             )}

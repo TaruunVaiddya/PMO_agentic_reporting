@@ -17,7 +17,18 @@ export const fetcher = async (path: string) => {
   
     if (!response.ok) {
       const bodyText = await response.json()
-      throw new Error(bodyText?.detail || "Request failed")
+      // Handle both string and object detail formats
+      let errorMessage = "Request failed"
+      if (bodyText?.detail) {
+        if (typeof bodyText.detail === 'string') {
+          errorMessage = bodyText.detail
+        } else if (typeof bodyText.detail === 'object' && bodyText.detail.error) {
+          errorMessage = bodyText.detail.error
+        } else if (typeof bodyText.detail === 'object') {
+          errorMessage = JSON.stringify(bodyText.detail)
+        }
+      }
+      throw new Error(errorMessage)
     }
   
     try {

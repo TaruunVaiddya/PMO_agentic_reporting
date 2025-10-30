@@ -1,6 +1,9 @@
-import { FileText, FileSpreadsheet, MoreVertical, Clock, CheckCircle, AlertCircle, Loader2, AlertTriangle, BarChart3, PieChart, TrendingUp, Database, Brain, FileBarChart, Activity, Target, Zap, Sparkles, RotateCcw } from 'lucide-react'
+import { FileText, FileSpreadsheet, MoreVertical, Clock, CheckCircle, AlertCircle, Loader2, AlertTriangle, BarChart3, PieChart, TrendingUp, Database, Brain, FileBarChart, Activity, Target, Zap, Sparkles, RotateCcw, Trash2 } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/date-utils'
 import { useRouter } from 'next/navigation'
+import { postFetcher } from '@/lib/post-fetcher'
+import { useState, useRef, useEffect } from 'react'
+import { toast } from 'sonner'
 
 interface DocumentCardProps {
   documentId: string
@@ -12,6 +15,8 @@ interface DocumentCardProps {
   uploadDate: string
   userSuggestion?: string | null
   onClick?: () => void
+  onDigest?: (documentId: string) => void
+  onDelete?: (documentId: string) => void
 }
 
 export function DocumentCard({
@@ -23,9 +28,75 @@ export function DocumentCard({
   documentSize,
   uploadDate,
   userSuggestion,
-  onClick
+  onClick,
+  onDigest,
+  onDelete
 }: DocumentCardProps) {
   const router = useRouter()
+  const [isDigesting, setIsDigesting] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showDropdown])
+
+  const handleDeleteClick = async () => {
+    setShowDeleteConfirm(false)
+    setShowDropdown(false)
+    setIsDeleting(true)
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/documents/${documentId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete document')
+      }
+
+      toast.success('Document deleted successfully')
+      // Optimistically update the UI by removing the document
+      onDelete?.(documentId)
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to delete document')
+      setIsDeleting(false)
+    }
+  }
+
+  const handleDigestClick = async (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent card click and side window from opening
+
+    setIsDigesting(true)
+    try {
+      await postFetcher('/documents/digest', {
+        document_id: documentId,
+        document_type: documentType
+      })
+
+      // Only update status to IN_QUEUE if API succeeds
+      onDigest?.(documentId)
+      toast.success('Document digest started successfully')
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to start document digest')
+      // Don't call onDigest if it fails, so the card stays in current state
+    } finally {
+      setIsDigesting(false)
+    }
+  }
 
   const formatFileSize = (bytes: number) => {
     if (!bytes || bytes <= 0) return '0 B'
@@ -87,24 +158,92 @@ export function DocumentCard({
   }
 
   return (
-    <div
-      onClick={handleCardClick}
-      className="group relative bg-card hover:bg-white/5 border border-white/15 hover:border-white/20 rounded-lg p-4 transition-all duration-200 cursor-pointer overflow-hidden h-full flex flex-col">
-      
-      <span className={`absolute top-3 right-3 px-1.5 py-0.5 text-xs font-medium rounded transition-opacity group-hover:opacity-0 ${
-        documentType === 'Excel'
-          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-          : documentType === 'PDF'
-          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-          : 'bg-slate-500/20 text-white/60 border border-slate-500/30'
-      }`}>
-        {documentType || 'File'}
-      </span>
-      {/* <span className=' absolute -bottom-1/2 bg-white w-1/4 h-1/4 blur-3xl rounded-full left-1/3' /> */}
+    <>
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-white/20 rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <h3 className="text-lg font-semibold text-white/90 mb-2">Delete Document</h3>
+            <p className="text-sm text-white/60 mb-6">
+              Are you sure you want to delete "{documentName}"? This action cannot be undone.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowDeleteConfirm(false)
+                }}
+                className="px-4 py-2 text-sm text-white/80 hover:text-white/90 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDeleteClick()
+                }}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      <button className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-white/10 rounded cursor-pointer">
-        <MoreVertical className="w-4 h-4 text-white/60" />
-      </button>
+      <div
+        onClick={handleCardClick}
+        className={`group relative bg-card hover:bg-white/5 border border-white/15 hover:border-white/20 rounded-lg p-4 transition-all duration-200 cursor-pointer overflow-hidden h-full flex flex-col ${
+          isDeleting ? 'opacity-50 pointer-events-none' : ''
+        }`}
+      >
+        {/* Deleting Overlay */}
+        {isDeleting && (
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center rounded-lg">
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="w-6 h-6 text-white/80 animate-spin" />
+              <span className="text-xs text-white/80">Deleting...</span>
+            </div>
+          </div>
+        )}
+
+        <span className={`absolute top-3 right-3 px-1.5 py-0.5 text-xs font-medium rounded transition-opacity group-hover:opacity-0 ${
+          documentType === 'Excel'
+            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+            : documentType === 'PDF'
+            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+            : 'bg-slate-500/20 text-white/60 border border-slate-500/30'
+        }`}>
+          {documentType || 'File'}
+        </span>
+
+        <div ref={dropdownRef} className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowDropdown(!showDropdown)
+            }}
+            className="p-1.5 hover:bg-white/10 rounded cursor-pointer"
+          >
+            <MoreVertical className="w-4 h-4 text-white/60" />
+          </button>
+
+          {showDropdown && (
+            <div className="absolute right-0 mt-1 w-40 bg-gray-900 border border-white/20 rounded-lg shadow-xl py-1 z-50">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowDropdown(false)
+                  setShowDeleteConfirm(true)
+                }}
+                className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-white/5 transition-colors flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
 
       <div className="flex flex-col gap-3 flex-1">
         <div className="w-12 h-12 rounded-lg bg-gradient-to-t from-white/5 to-white/10 border border-white/10 flex items-center justify-center flex-shrink-0">
@@ -135,15 +274,25 @@ export function DocumentCard({
         <div className="space-y-2 mt-auto">
           {processingStatus === 'NOT_STARTED' ? (
             <div className="relative group">
-              <button className="relative w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-lg transition-all duration-300 text-xs font-medium text-white/80 hover:text-blue-400 cursor-pointer border border-white/10 hover:border-white/20 overflow-hidden">
+              <button
+                onClick={handleDigestClick}
+                disabled={isDigesting}
+                className="relative w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-lg transition-all duration-300 text-xs font-medium text-white/80 hover:text-blue-400 cursor-pointer border border-white/10 hover:border-white/20 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <div
                   className="absolute inset-0 z-0 pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity duration-300"
                   style={{
                     background: "radial-gradient(circle, rgba(59,130,246,0.25) 0%, rgba(37,99,235,0.12) 50%, rgba(29,78,216,0) 100%)"
                   }}
                 />
-                <Sparkles className="w-3 h-3 relative z-10" />
-                <span className="relative z-10">Digest Document</span>
+                {isDigesting ? (
+                  <Loader2 className="w-3 h-3 relative z-10 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3 h-3 relative z-10" />
+                )}
+                <span className="relative z-10">
+                  {isDigesting ? 'Starting...' : 'Digest Document'}
+                </span>
               </button>
             </div>
           ) : processingStatus === 'FAILED' ? (
@@ -153,15 +302,25 @@ export function DocumentCard({
                 <span className="text-xs text-white/60">{getStatusText()}</span>
               </div>
               <div className="relative group">
-                <button className="relative w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-lg transition-all duration-300 text-xs font-medium text-white/80 hover:text-red-400 cursor-pointer border border-white/10 hover:border-white/20 overflow-hidden">
+                <button
+                  onClick={handleDigestClick}
+                  disabled={isDigesting}
+                  className="relative w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-lg transition-all duration-300 text-xs font-medium text-white/80 hover:text-red-400 cursor-pointer border border-white/10 hover:border-white/20 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   <div
                     className="absolute inset-0 z-0 pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity duration-300"
                     style={{
                       background: "radial-gradient(circle, rgba(239,68,68,0.25) 0%, rgba(220,38,38,0.12) 50%, rgba(185,28,28,0) 100%)"
                     }}
                   />
-                  <RotateCcw className="w-3 h-3 relative z-10" />
-                  <span className="relative z-10">Retry Digest</span>
+                  {isDigesting ? (
+                    <Loader2 className="w-3 h-3 relative z-10 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-3 h-3 relative z-10" />
+                  )}
+                  <span className="relative z-10">
+                    {isDigesting ? 'Retrying...' : 'Retry Digest'}
+                  </span>
                 </button>
               </div>
             </div>
@@ -182,6 +341,7 @@ export function DocumentCard({
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }

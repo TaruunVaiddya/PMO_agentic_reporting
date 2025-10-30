@@ -18,7 +18,7 @@ export const SidebarToggle: React.FC<SidebarToggleProps> = ({
     <Button
       variant="ghost"
       size="icon"
-      onClick={()=>toggle}
+      onClick={toggle}
       className={cn(
         'h-8 w-8 rounded-md hover:bg-accent transition-colors cursor-pointer',
         className

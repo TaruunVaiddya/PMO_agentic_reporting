@@ -1,4 +1,5 @@
 import generateUniqueId from '@/lib/get_unique_id';
+import type { ContentEvent } from '@/types/chat';
 
 export interface ChatServiceConfig {
   chatStore: any;
@@ -10,10 +11,8 @@ export interface ChatServiceConfig {
 
 export default class SSEChatHandler {
     private chatId: string | null = null;
-    private chunks: string[] = [];
-    private reasoningChunks: string[] = [];
-    private isReasoningComplete = false;
-    private reasoningDuration?: number;
+    private events: ContentEvent[] = [];
+    private pendingEvents: ContentEvent[] = [];
     private updateInterval: NodeJS.Timeout | null = null;
     private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
     private decoder = new TextDecoder();
@@ -70,8 +69,8 @@ export default class SSEChatHandler {
   
         this.reader = response.body?.getReader() || null;
         
-        // Use requestAnimationFrame for better performance than setInterval
-        this.scheduleChunkProcessing();
+        // Schedule periodic event processing
+        this.scheduleEventProcessing();
         
         await this.processStream();
   
@@ -82,46 +81,30 @@ export default class SSEChatHandler {
       }
     }
   
-    private scheduleChunkProcessing(): void {
-      const processChunks = () => {
-        if (this.chatId && (this.chunks.length > 0 || this.reasoningChunks.length > 0)) {
-          // Batch process both reasoning and content chunks
-          const previousMessage = this.chatStore?.getChat(this.chatId)?.assistantMessage || {};
+    private scheduleEventProcessing(): void {
+      const processEvents = () => {
+        if (this.chatId && this.pendingEvents.length > 0) {
+          // Append pending events to the main events array
+          this.events.push(...this.pendingEvents);
+          this.pendingEvents = [];
           
-          const newReasoningContent = this.reasoningChunks.join('');
-          const previousReasoningContent = previousMessage.reasoning?.content || '';
-          
-          const newContent = this.chunks.join('');
-          const previousContent = previousMessage.content || '';
-          
+          // Update the store with the full events array
           const updatedMessage: any = {
             id: this.chatId,
-            content: previousContent + newContent,
+            content: [...this.events], // Clone the array
             role: 'assistant',
           };
           
-          // Add reasoning if exists
-          if (previousReasoningContent || newReasoningContent) {
-            updatedMessage.reasoning = {
-              content: previousReasoningContent + newReasoningContent,
-              complete: this.isReasoningComplete,
-              ...(this.reasoningDuration !== undefined && { duration: this.reasoningDuration })
-            };
-          }
-          
           this.chatStore?.addChat(updatedMessage, this.chatId, 'assistant');
-          
-          this.reasoningChunks.length = 0;
-          this.chunks.length = 0; 
         }
   
         // Continue scheduling if chat is active
         if (this.chatId && !this.abortController.signal.aborted) {
-          this.updateInterval = setTimeout(processChunks, 200); 
+          this.updateInterval = setTimeout(processEvents, 200); 
         }
       };
   
-      this.updateInterval = setTimeout(processChunks, 200);
+      this.updateInterval = setTimeout(processEvents, 200);
     }
   
     private async processStream(): Promise<void> {
@@ -182,15 +165,11 @@ export default class SSEChatHandler {
         case 'reasoning':
           try {
             const reasoningData = JSON.parse(data);
-            if (reasoningData.delta) {
-              this.reasoningChunks.push(reasoningData.delta);
-            }
-            if (reasoningData.complete) {
-              this.isReasoningComplete = true;
-              if (reasoningData.duration !== undefined) {
-                this.reasoningDuration = reasoningData.duration;
-              }
-            }
+            // Append reasoning event to pending events
+            this.pendingEvents.push({
+              event: 'reasoning',
+              data: reasoningData
+            });
           } catch (parseError) {
             console.warn('Invalid reasoning data:', data);
           }
@@ -199,16 +178,57 @@ export default class SSEChatHandler {
         case 'delta':
           try {
             const deltaData = JSON.parse(data);
-            if (deltaData.delta) {
-              this.chunks.push(deltaData.delta);
-            }
+            // Append delta event to pending events
+            this.pendingEvents.push({
+              event: 'delta',
+              data: deltaData
+            });
           } catch (parseError) {
             console.warn('Invalid delta data:', data);
           }
           break;
+
+        case 'tool_call':
+          try {
+            const toolCallData = JSON.parse(data);
+            // Append tool_call event to pending events
+            this.pendingEvents.push({
+              event: 'tool_call',
+              data: toolCallData
+            });
+          } catch (parseError) {
+            console.warn('Invalid tool_call data:', data);
+          }
+          break;
+
+        case 'task':
+          try {
+            const taskData = JSON.parse(data);
+            // Append task event to pending events
+            this.pendingEvents.push({
+              event: 'task',
+              data: taskData
+            });
+          } catch (parseError) {
+            console.warn('Invalid task data:', data);
+          }
+          break;
+
+        case 'metadata':
+          try {
+            const metadataData = JSON.parse(data);
+            // Append metadata event to pending events
+            this.pendingEvents.push({
+              event: 'metadata',
+              data: metadataData
+            });
+          } catch (parseError) {
+            console.warn('Invalid metadata data:', data);
+          }
+          break;
   
         case 'end':
-          this.processRemainingChunks();
+          this.processRemainingEvents();
           if (this.chatId) {
             this.chatStore?.updateChatStatus(this.chatId, 'Completed');
           }
@@ -228,35 +248,20 @@ export default class SSEChatHandler {
       return false;
     }
   
-    private processRemainingChunks(): void {
-      if (this.chatId && (this.chunks.length > 0 || this.reasoningChunks.length > 0)) {
-        const previousMessage = this.chatStore?.getChat(this.chatId)?.assistantMessage || {};
+    private processRemainingEvents(): void {
+      if (this.chatId && this.pendingEvents.length > 0) {
+        // Process any remaining pending events
+        this.events.push(...this.pendingEvents);
+        this.pendingEvents = [];
         
-        const newReasoningContent = this.reasoningChunks.join('');
-        const previousReasoningContent = previousMessage.reasoning?.content || '';
-        
-        const newContent = this.chunks.join('');
-        const previousContent = previousMessage.content || '';
-        
+        // Final update to the store
         const updatedMessage: any = {
           id: this.chatId,
-          content: previousContent + newContent,
+          content: [...this.events],
           role: 'assistant',
         };
         
-        // Add reasoning if exists
-        if (previousReasoningContent || newReasoningContent) {
-          updatedMessage.reasoning = {
-            content: previousReasoningContent + newReasoningContent,
-            complete: this.isReasoningComplete,
-            ...(this.reasoningDuration !== undefined && { duration: this.reasoningDuration })
-          };
-        }
-        
         this.chatStore?.addChat(updatedMessage, this.chatId, 'assistant');
-        
-        this.reasoningChunks.length = 0;
-        this.chunks.length = 0;
       }
     }
   
@@ -271,7 +276,7 @@ export default class SSEChatHandler {
         this.reader = null;
       }
   
-      this.processRemainingChunks();
+      this.processRemainingEvents();
     }
   
     public abort(): void {

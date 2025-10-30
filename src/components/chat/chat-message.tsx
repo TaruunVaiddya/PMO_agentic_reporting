@@ -20,6 +20,7 @@ import {
   ToolContent,
   ToolOutput
 } from '@/components/ai-elements/tool';
+import { CodeBlock } from '@/components/ai-elements/code-block';
 import { Copy, RefreshCw, ThumbsUp, ThumbsDown, Monitor, WrenchIcon, CircleIcon, ClockIcon, CheckCircleIcon, XCircleIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,7 +30,7 @@ import { ChatStatus } from '@/types/chat';
 export interface TaskData {
   id: string;
   title: string;
-  status: 'pending' | 'running' | 'completed' | 'error';
+  status: 'pending' | 'running' | 'completed' | 'failed';
   description?: string;
   files?: string[];
 }
@@ -50,8 +51,10 @@ export interface ChatMessageData {
   sender: 'user' | 'assistant';
   timestamp: Date;
   files?: any[];
-  reasoning?: string;
   isStreaming?: boolean;
+  events?: import('@/types/chat').ContentEvent[]; // New: ordered events array
+  // Legacy fields (deprecated, kept for backward compatibility)
+  reasoning?: string;
   reasoningDuration?: number;
   reasoningStreaming?: boolean;
   tasks?: TaskData[];
@@ -80,23 +83,182 @@ export const ChatMessage = React.memo(({
   const isUser = message.sender === 'user';
   const isAssistant = message.sender === 'assistant';
 
+  // Process events if available (new approach) - preserving order
+  const processedEvents = React.useMemo(() => {
+    if (!message.events || message.events.length === 0) return null;
+
+    // Create ordered items that maintain the sequence of events
+    const orderedItems: Array<{
+      type: 'reasoning' | 'tool_call' | 'task' | 'text';
+      idx: number;
+      data: any;
+    }> = [];
+    
+    const toolCallsMap = new Map<string, { data: any; idx: number }>();
+    const tasksMap = new Map<string, { data: any; idx: number }>();
+    const textChunks: string[] = [];
+    let currentReasoningChunks: string[] = [];
+    let currentReasoningStartIdx = -1;
+
+    // Single pass through events for better performance
+    for (let idx = 0; idx < message.events.length; idx++) {
+      const event = message.events[idx];
+      
+      switch (event.event) {
+        case 'reasoning':
+          if (event.data.delta) {
+            if (currentReasoningStartIdx === -1) {
+              currentReasoningStartIdx = idx;
+            }
+            currentReasoningChunks.push(event.data.delta);
+          }
+          if (event.data.complete) {
+            // Add completed reasoning block at its position
+            orderedItems.push({
+              type: 'reasoning',
+              idx: currentReasoningStartIdx,
+              data: {
+                content: currentReasoningChunks.join(''),
+                duration: event.data.duration,
+                complete: true
+              }
+            });
+            currentReasoningChunks = [];
+            currentReasoningStartIdx = -1;
+          }
+          break;
+
+        case 'tool_call':
+          // Track tool call and its first occurrence index
+          const existing = toolCallsMap.get(event.data.id);
+          if (existing) {
+            // Update existing tool call data
+            existing.data = { ...existing.data, ...event.data };
+          } else {
+            // First time seeing this tool call
+            toolCallsMap.set(event.data.id, { data: event.data, idx });
+            orderedItems.push({
+              type: 'tool_call',
+              idx,
+              data: { id: event.data.id } // Placeholder, will be filled later
+            });
+          }
+          break;
+
+        case 'task':
+          const existingTask = tasksMap.get(event.data.task.id);
+          const taskStatus: TaskStatus = event.data.task.status === 'error' 
+            ? 'failed' 
+            : event.data.task.status as TaskStatus;
+          
+          if (existingTask) {
+            existingTask.data = { ...existingTask.data, ...event.data.task, status: taskStatus };
+          } else {
+            tasksMap.set(event.data.task.id, { data: { ...event.data.task, status: taskStatus }, idx });
+            orderedItems.push({
+              type: 'task',
+              idx,
+              data: { id: event.data.task.id }
+            });
+          }
+          break;
+
+        case 'delta':
+          textChunks.push(event.data.delta);
+          break;
+      }
+    }
+
+    // If there's incomplete reasoning, add it
+    if (currentReasoningChunks.length > 0) {
+      orderedItems.push({
+        type: 'reasoning',
+        idx: currentReasoningStartIdx,
+        data: {
+          content: currentReasoningChunks.join(''),
+          complete: false
+        }
+      });
+    }
+
+    // Fill in the actual tool call and task data
+    for (let i = 0; i < orderedItems.length; i++) {
+      const item = orderedItems[i];
+      if (item.type === 'tool_call') {
+        const toolData = toolCallsMap.get(item.data.id);
+        if (toolData) {
+          item.data = toolData.data;
+        }
+      } else if (item.type === 'task') {
+        const taskData = tasksMap.get(item.data.id);
+        if (taskData) {
+          item.data = taskData.data;
+        }
+      }
+    }
+
+    return {
+      orderedItems,
+      textContent: textChunks.join('')
+    };
+  }, [message.events]);
+
   return (
     <Message
       from={message.sender}
       className="group/message w-full"
     >
       <div className={cn(
-        "w-full flex flex-col gap-2 w-full",
+        "w-full flex flex-col gap-2",
         isUser ? 'items-end' : 'items-start'
       )}>
-        {/* Show reasoning for assistant messages if available */}
-        {isAssistant && message.reasoning && (
+        {/* Render events in their actual order */}
+        {isAssistant && processedEvents && (
+          <>
+            {processedEvents.orderedItems.map((item, itemIdx) => {
+              // Render based on item type
+              if (item.type === 'reasoning') {
+                return (
+                  <ReasoningBlock
+                    key={`reasoning-${item.idx}-${itemIdx}`}
+                    data={item.data}
+                    status={status}
+                  />
+                );
+              }
+
+              if (item.type === 'tool_call') {
+                return (
+                  <ToolCallBlock
+                    key={`tool-${item.data.id}-${itemIdx}`}
+                    toolCall={item.data}
+                    onPreviewClick={onPreviewClick}
+                  />
+                );
+              }
+
+              if (item.type === 'task') {
+                return (
+                  <TaskBlock
+                    key={`task-${item.data.id}-${itemIdx}`}
+                    task={item.data}
+                  />
+                );
+              }
+
+              return null;
+            })}
+          </>
+        )}
+
+        {/* Legacy: Show reasoning for assistant messages if available (backward compatibility) */}
+        {isAssistant && !processedEvents && message.reasoning && (
           <div className="w-full">
             <Reasoning
-              isStreaming={message.reasoningStreaming?true:false}
+              isStreaming={message.reasoningStreaming}
               duration={message.reasoningDuration}
               className="mb-3"
-              defaultOpen={status!='Completed'}
+              defaultOpen={status !== 'Completed'}
             >
               <ReasoningTrigger />
               <ReasoningContent>{message.reasoning}</ReasoningContent>
@@ -104,8 +266,8 @@ export const ChatMessage = React.memo(({
           </div>
         )}
 
-        {/* Show tasks for assistant messages if available */}
-        {isAssistant && message.tasks && message.tasks.length > 0 && (
+        {/* Legacy: Show tasks for assistant messages if available (backward compatibility) */}
+        {isAssistant && !processedEvents && message.tasks && message.tasks.length > 0 && (
           <div className="w-full mb-3">
             <Task>
               <TaskTrigger
@@ -136,8 +298,8 @@ export const ChatMessage = React.memo(({
           </div>
         )}
 
-        {/* Show tool calls for assistant messages if available */}
-        {isAssistant && message.toolCalls && message.toolCalls.length > 0 && (
+        {/* Legacy: Show tool calls for assistant messages if available (backward compatibility) */}
+        {isAssistant && !processedEvents && message.toolCalls && message.toolCalls.length > 0 && (
           <div className="w-full space-y-3 mb-3">
             {message.toolCalls.map(toolCall => (
               <div
@@ -149,19 +311,8 @@ export const ChatMessage = React.memo(({
                     : ""
                 )}
                 onClick={() => {
-                  console.log('🔍 Tool card clicked:', {
-                    state: toolCall.state,
-                    name: toolCall.name,
-                    hasOutput: !!toolCall.output,
-                    outputHtml: !!toolCall.output?.html
-                  });
-
-                  // Always try to call onPreviewClick for generate_preview tools that are completed
                   if (toolCall.name === 'generate_preview' && toolCall.state === 'output-available') {
-                    console.log('✅ Calling onPreviewClick...');
                     onPreviewClick?.(toolCall);
-                  } else {
-                    console.log('❌ Not calling onPreviewClick - state:', toolCall.state, 'name:', toolCall.name);
                   }
                 }}
               >
@@ -213,7 +364,9 @@ export const ChatMessage = React.memo(({
           data-user={isUser}
         >
           {isAssistant ? (
-            <Response className='w-full'>{message.content}</Response>
+            <Response className='w-full'>
+              {processedEvents ? processedEvents.textContent : message.content}
+            </Response>
           ) : (
             <div className="w-full">
               {message.content}
@@ -269,3 +422,107 @@ export const ChatMessage = React.memo(({
 });
 
 ChatMessage.displayName = 'ChatMessage';
+
+// Memoized sub-components for better performance
+const ReasoningBlock = React.memo(({ data, status }: { data: any; status?: ChatStatus }) => (
+  <div className="w-full">
+    <Reasoning
+      isStreaming={!data.complete}
+      duration={data.duration}
+      className="mb-3"
+      defaultOpen={!data.complete || status !== 'Completed'}
+    >
+      <ReasoningTrigger />
+      <ReasoningContent>{data.content}</ReasoningContent>
+    </Reasoning>
+  </div>
+));
+
+const ToolCallBlock = React.memo(({ toolCall, onPreviewClick }: { toolCall: any; onPreviewClick?: (toolCall: any) => void }) => {
+  const toolTitle = toolCall.name === 'generate_preview' ? 'Dashboard Preview' : toolCall.name || 'Tool';
+  
+  return (
+    <div className="w-full">
+      <Tool className="border border-white/20 rounded-lg">
+        <ToolHeader
+          title={toolTitle}
+          type={toolCall.name || 'tool'}
+          state={toolCall.state}
+          className="text-white/85"
+        />
+        <ToolContent>
+          {/* Show input if available */}
+          {toolCall.input && (
+            <div className="space-y-2 p-4">
+              <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                Parameters
+              </h4>
+              <div className="rounded-md bg-muted/50 border border-white/10">
+                <CodeBlock code={JSON.stringify(toolCall.input, null, 2)} language="json" />
+              </div>
+            </div>
+          )}
+          
+          {/* Show output if available */}
+          <div className="p-4">
+            {(toolCall.output || toolCall.errorText) && (
+              <div className="rounded-md bg-muted/50 border border-white/10 overflow-x-auto">
+                <ToolOutput
+                  output={toolCall.output}
+                  errorText={toolCall.errorText}
+                  className=" !border-none !rounded-none"
+                />
+              </div>
+            )}
+          </div>
+          
+          {/* Special handling for generate_preview tool */}
+          {toolCall.state === 'output-available' && toolCall.name === 'generate_preview' && toolCall.output && (
+            <div className="p-4 border-t">
+              <button
+                onClick={() => onPreviewClick?.(toolCall)}
+                className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+              >
+                <Monitor className="w-4 h-4" />
+                <span>Open Preview</span>
+              </button>
+            </div>
+          )}
+        </ToolContent>
+      </Tool>
+    </div>
+  );
+});
+
+const TaskBlock = React.memo(({ task }: { task: any }) => (
+  <div className="w-full">
+    <Task>
+      <TaskTrigger
+        title="Agent Task"
+        taskCount={1}
+        completedCount={task.status === 'completed' ? 1 : 0}
+      />
+      <TaskContent>
+        <TaskItem status={task.status}>
+          <span className="font-medium">{task.title}</span>
+          {task.description && (
+            <span className="text-muted-foreground ml-2">
+              {task.description}
+            </span>
+          )}
+          {task.files && task.files.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {task.files.map((file: string, idx: number) => (
+                <TaskItemFile key={idx}>{file}</TaskItemFile>
+              ))}
+            </div>
+          )}
+        </TaskItem>
+      </TaskContent>
+    </Task>
+  </div>
+));
+
+ReasoningBlock.displayName = 'ReasoningBlock';
+ToolCallBlock.displayName = 'ToolCallBlock';
+TaskBlock.displayName = 'TaskBlock'

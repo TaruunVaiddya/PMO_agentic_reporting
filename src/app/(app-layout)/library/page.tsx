@@ -7,6 +7,9 @@ import { DocumentListItem } from '@/components/library/document-list-item'
 import { UploadModal } from '@/components/library/upload-modal'
 import { PdfPreviewDrawer } from '@/components/library/pdf-preview-drawer'
 import { MetallicButton } from '@/components/ui/metallic-button'
+import { Skeleton } from '@/components/ui/skeleton'
+import useSWR from 'swr'
+import { fetcher } from '@/lib/get-fetcher'
 
 export default function LibraryPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -18,181 +21,39 @@ export default function LibraryPage() {
   const [selectedPdf, setSelectedPdf] = useState<any>(null)
   const [showPdfPreview, setShowPdfPreview] = useState(false)
 
-  // Sample data - replace with actual API data
-  const documents = [
-    {
-      document_id: '1',
-      document_name: 'Q3 Financial Report.pdf',
-      document_type: 'PDF',
-      processing_status: 'COMPLETED' as const,
-      percentage_completion: 100,
-      document_size: 2516582,
-      upload_date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      user_suggestion: null
-    },
-    {
-      document_id: '2',
-      document_name: 'Sales Data August 2024.xlsx',
-      document_type: 'Excel',
-      processing_status: 'PROCESSING' as const,
-      percentage_completion: 65,
-      document_size: 1887436,
-      upload_date: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      user_suggestion: null
-    },
-    {
-      document_id: '3',
-      document_name: 'Product Inventory.xlsx',
-      document_type: 'Excel',
-      processing_status: 'COMPLETED' as const,
-      percentage_completion: 100,
-      document_size: 3355443,
-      upload_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      user_suggestion: null
-    },
-    {
-      document_id: '4',
-      document_name: 'Annual Report 2023.pdf',
-      document_type: 'PDF',
-      processing_status: 'FAILED' as const,
-      percentage_completion: 0,
-      document_size: 5872025,
-      upload_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      user_suggestion: 'Document appears to be corrupted. Please try uploading again.'
-    },
-    {
-      document_id: '5',
-      document_name: 'Customer Feedback Analysis.xlsx',
-      document_type: 'Excel',
-      processing_status: 'COMPLETED' as const,
-      percentage_completion: 100,
-      document_size: 911360,
-      upload_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      user_suggestion: null
-    },
-    {
-      document_id: '6',
-      document_name: 'Marketing Campaign Results.pdf',
-      document_type: 'PDF',
-      processing_status: 'IN_QUEUE' as const,
-      percentage_completion: 0,
-      document_size: 1258291,
-      upload_date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-      user_suggestion: null
-    },
-    // {
-    //   document_id: '7',
-    //   document_name: 'Budget Analysis 2024.xlsx',
-    //   document_type: 'Excel',
-    //   processing_status: 'NOT_STARTED' as const,
-    //   percentage_completion: 0,
-    //   document_size: 2145728,
-    //   upload_date: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-    //   user_suggestion: null
-    // },
-    // {
-    //   document_id: '8',
-    //   document_name: 'Very Long Document Name That Should Test The Two Line Truncation Feature In Our Card View Component.pdf',
-    //   document_type: 'PDF',
-    //   processing_status: 'COMPLETED' as const,
-    //   percentage_completion: 100,
-    //   document_size: 0, // Test zero file size
-    //   upload_date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    //   user_suggestion: null
-    // },
-    // {
-    //   document_id: '5',
-    //   document_name: 'Customer Feedback Analysis.xlsx',
-    //   document_type: 'Excel',
-    //   processing_status: 'COMPLETED' as const,
-    //   percentage_completion: 100,
-    //   document_size: 911360,
-    //   upload_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    //   user_suggestion: null
-    // },
-    // {
-    //   document_id: '6',
-    //   document_name: 'Marketing Campaign Results.pdf',
-    //   document_type: 'PDF',
-    //   processing_status: 'IN_QUEUE' as const,
-    //   percentage_completion: 0,
-    //   document_size: 1258291,
-    //   upload_date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-    //   user_suggestion: null
-    // },
-    // {
-    //   document_id: '7',
-    //   document_name: 'Budget Analysis 2024.xlsx',
-    //   document_type: 'Excel',
-    //   processing_status: 'NOT_STARTED' as const,
-    //   percentage_completion: 0,
-    //   document_size: 2145728,
-    //   upload_date: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-    //   user_suggestion: null
-    // },
-    // {
-    //   document_id: '8',
-    //   document_name: 'Very Long Document Name That Should Test The Two Line Truncation Feature In Our Card View Component.pdf',
-    //   document_type: 'PDF',
-    //   processing_status: 'COMPLETED' as const,
-    //   percentage_completion: 100,
-    //   document_size: 0, // Test zero file size
-    //   upload_date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    //   user_suggestion: null
-    // },
-    // {
-    //   document_id: '5',
-    //   document_name: 'Customer Feedback Analysis.xlsx',
-    //   document_type: 'Excel',
-    //   processing_status: 'COMPLETED' as const,
-    //   percentage_completion: 100,
-    //   document_size: 911360,
-    //   upload_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    //   user_suggestion: null
-    // },
-    // {
-    //   document_id: '6',
-    //   document_name: 'Marketing Campaign Results.pdf',
-    //   document_type: 'PDF',
-    //   processing_status: 'IN_QUEUE' as const,
-    //   percentage_completion: 0,
-    //   document_size: 1258291,
-    //   upload_date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-    //   user_suggestion: null
-    // },
-    // {
-    //   document_id: '7',
-    //   document_name: 'Budget Analysis 2024.xlsx',
-    //   document_type: 'Excel',
-    //   processing_status: 'NOT_STARTED' as const,
-    //   percentage_completion: 0,
-    //   document_size: 2145728,
-    //   upload_date: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-    //   user_suggestion: null
-    // },
-    // {
-    //   document_id: '8',
-    //   document_name: 'Very Long Document Name That Should Test The Two Line Truncation Feature In Our Card View Component.pdf',
-    //   document_type: 'PDF',
-    //   processing_status: 'COMPLETED' as const,
-    //   percentage_completion: 100,
-    //   document_size: 0, // Test zero file size
-    //   upload_date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    //   user_suggestion: null
-    // }
-  ]
+  // Use SWR for better data fetching and caching
+  const { data, error: swrError, isLoading, mutate } = useSWR('/documents', fetcher, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: true,
+  })
 
-  // Filter documents based on search and filters
-  const filteredDocuments = documents.filter(doc => {
-    // Search filter
-    const matchesSearch = searchQuery === '' ||
-      doc.document_name.toLowerCase().includes(searchQuery.toLowerCase())
+  const documents = Array.isArray(data) ? data : (data?.documents ?? [])
 
-    // Type filter
-    const matchesType = filterType === 'all' || doc.document_type === filterType
+  // Handle various error formats
+  let error: string | null = null
+  if (swrError) {
+    if (swrError?.message) {
+      error = typeof swrError.message === 'string' ? swrError.message : 'Failed to load documents'
+    } else if (swrError?.detail) {
+      if (typeof swrError.detail === 'string') {
+        error = swrError.detail
+      } else if (typeof swrError.detail === 'object' && swrError.detail.error) {
+        error = swrError.detail.error
+      }
+    } else {
+      error = 'Failed to load documents'
+    }
+  }
 
-    // Status filter
-    const matchesStatus = filterStatus === 'all' || doc.processing_status === filterStatus
+  // Filter documents based on search and filters (normalize on the fly)
+  const filteredDocuments = documents.filter((doc: any) => {
+    const name = (doc.document_name ?? doc.name ?? '') as string
+    const type = (doc.document_type ?? 'OTHER') as string
+    const status = (doc.processing_status ?? 'NOT_STARTED') as string
+
+    const matchesSearch = searchQuery === '' || name.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesType = filterType === 'all' || type === filterType
+    const matchesStatus = filterStatus === 'all' || status === filterStatus
 
     return matchesSearch && matchesType && matchesStatus
   })
@@ -219,11 +80,55 @@ export default function LibraryPage() {
     setSelectedPdf(null)
   }
 
+  const handleDigest = (documentId: string) => {
+    // Optimistically update the document status to IN_QUEUE
+    mutate((currentData: any) => {
+      const currentDocs = Array.isArray(currentData) ? currentData : (currentData?.documents ?? [])
+      const updatedDocs = currentDocs.map((doc: any) =>
+        (doc.document_id ?? doc.id) === documentId
+          ? { ...doc, processing_status: 'IN_QUEUE', percentage_completion: 0 }
+          : doc
+      )
+      return Array.isArray(currentData)
+        ? updatedDocs
+        : { ...currentData, documents: updatedDocs }
+    }, false) // false = don't revalidate immediately
+
+    // Revalidate in the background to get server state
+    setTimeout(() => mutate(), 1000)
+  }
+
+  const handleDelete = (documentId: string) => {
+    // Optimistically remove the document from the list
+    mutate((currentData: any) => {
+      const currentDocs = Array.isArray(currentData) ? currentData : (currentData?.documents ?? [])
+      const updatedDocs = currentDocs.filter((doc: any) => (doc.document_id ?? doc.id) !== documentId)
+      return Array.isArray(currentData)
+        ? updatedDocs
+        : { ...currentData, documents: updatedDocs }
+    }, false) // false = don't revalidate immediately
+
+    // Revalidate in the background to sync with server
+    setTimeout(() => mutate(), 1000)
+  }
+
   return (
     <>
       <UploadModal
         open={showUploadModal}
         onOpenChange={setShowUploadModal}
+        onOptimisticUpdate={(newDocuments) => {
+          // Optimistically update the cache with new documents
+          mutate((currentData: any) => {
+            const currentDocs = Array.isArray(currentData) ? currentData : (currentData?.documents ?? [])
+            return Array.isArray(currentData)
+              ? [...newDocuments, ...currentDocs]
+              : { ...currentData, documents: [...newDocuments, ...currentDocs] }
+          }, false) // false = don't revalidate immediately, show optimistic data first
+
+          // Revalidate in the background to get the server state
+          setTimeout(() => mutate(), 500)
+        }}
       />
 
       <PdfPreviewDrawer
@@ -299,7 +204,7 @@ export default function LibraryPage() {
                 </button>
               </div>
 
-              <MetallicButton onClick={() => setShowUploadModal(true)}>
+              <MetallicButton type="button" onClick={() => setShowUploadModal(true)}>
                 <Upload className="w-4 h-4" />
                 <span>Upload</span>
               </MetallicButton>
@@ -386,7 +291,34 @@ export default function LibraryPage() {
 
           {/* Scrollable content area */}
           <div className="flex-1 overflow-y-auto custom-scrollbar">
-{documents.length === 0 ? (
+{isLoading ? (
+            <div className="pb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="p-4 rounded-xl border border-white/10 bg-black/10">
+                    <Skeleton className="h-40 w-full mb-4 rounded-lg" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                    </div>
+                    <div className="mt-4 flex items-center gap-2">
+                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="h-3 w-10" />
+                      <Skeleton className="h-3 w-12" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-t from-red-500/10 to-red-500/20 border border-red-500/30 flex items-center justify-center mb-4">
+                <X className="w-8 h-8 text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white/80 mb-2">Failed to load documents</h3>
+              <p className="text-sm text-white/50 mb-4">{error}</p>
+            </div>
+          ) : documents.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <div className="w-20 h-20 rounded-2xl bg-gradient-to-t from-white/5 to-white/10 border border-white/10 flex items-center justify-center mb-6">
                 <Upload className="w-10 h-10 text-white/60" />
@@ -397,7 +329,7 @@ export default function LibraryPage() {
               <p className="text-sm text-white/60 mb-8 max-w-md">
                 Start by uploading your first document. We support PDF and Excel files for AI-powered analysis and insights.
               </p>
-              <MetallicButton onClick={() => setShowUploadModal(true)} className="px-6 py-3 gap-3">
+              <MetallicButton type="button" onClick={() => setShowUploadModal(true)} className="px-6 py-3 gap-3">
                 <Upload className="w-4 h-4" />
                 <span>Upload Your First Document</span>
               </MetallicButton>
@@ -430,37 +362,65 @@ export default function LibraryPage() {
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-6">
-              {filteredDocuments.map((doc) => (
-                <DocumentCard
-                  key={doc.document_id}
-                  documentId={doc.document_id}
-                  documentName={doc.document_name}
-                  documentType={doc.document_type}
-                  processingStatus={doc.processing_status}
-                  percentageCompletion={doc.percentage_completion}
-                  documentSize={doc.document_size}
-                  uploadDate={doc.upload_date}
-                  userSuggestion={doc.user_suggestion}
-                  onClick={() => handleDocumentClick(doc)}
-                />
-              ))}
+              {filteredDocuments.map((doc: any) => {
+                const normalized = {
+                  document_id: doc.document_id ?? doc.id ?? '',
+                  document_name: doc.document_name ?? doc.name ?? 'Untitled',
+                  document_type: doc.document_type ?? 'OTHER',
+                  processing_status: doc.processing_status ?? 'NOT_STARTED',
+                  percentage_completion: doc.percentage_completion ?? 0,
+                  document_size: doc.document_size ?? doc.size ?? 0,
+                  upload_date: (doc.upload_date ?? doc.created_at ?? new Date().toISOString()),
+                  user_suggestion: doc.user_suggestion ?? null,
+                }
+                return (
+                  <DocumentCard
+                    key={normalized.document_id}
+                    documentId={normalized.document_id}
+                    documentName={normalized.document_name}
+                    documentType={normalized.document_type}
+                    processingStatus={normalized.processing_status}
+                    percentageCompletion={normalized.percentage_completion}
+                    documentSize={normalized.document_size}
+                    uploadDate={normalized.upload_date}
+                    userSuggestion={normalized.user_suggestion}
+                    onClick={() => handleDocumentClick(normalized)}
+                    onDigest={handleDigest}
+                    onDelete={handleDelete}
+                  />
+                )
+              })}
             </div>
           ) : (
             <div className="space-y-2 pb-6">
-              {filteredDocuments.map((doc) => (
-                <DocumentListItem
-                  key={doc.document_id}
-                  documentId={doc.document_id}
-                  documentName={doc.document_name}
-                  documentType={doc.document_type}
-                  processingStatus={doc.processing_status}
-                  percentageCompletion={doc.percentage_completion}
-                  documentSize={doc.document_size}
-                  uploadDate={doc.upload_date}
-                  userSuggestion={doc.user_suggestion}
-                  onClick={() => handleDocumentClick(doc)}
-                />
-              ))}
+              {filteredDocuments.map((doc: any) => {
+                const normalized = {
+                  document_id: doc.document_id ?? doc.id ?? '',
+                  document_name: doc.document_name ?? doc.name ?? 'Untitled',
+                  document_type: doc.document_type ?? 'OTHER',
+                  processing_status: doc.processing_status ?? 'NOT_STARTED',
+                  percentage_completion: doc.percentage_completion ?? 0,
+                  document_size: doc.document_size ?? doc.size ?? 0,
+                  upload_date: (doc.upload_date ?? doc.created_at ?? new Date().toISOString()),
+                  user_suggestion: doc.user_suggestion ?? null,
+                }
+                return (
+                  <DocumentListItem
+                    key={normalized.document_id}
+                    documentId={normalized.document_id}
+                    documentName={normalized.document_name}
+                    documentType={normalized.document_type}
+                    processingStatus={normalized.processing_status}
+                    percentageCompletion={normalized.percentage_completion}
+                    documentSize={normalized.document_size}
+                    uploadDate={normalized.upload_date}
+                    userSuggestion={normalized.user_suggestion}
+                    onClick={() => handleDocumentClick(normalized)}
+                    onDigest={handleDigest}
+                    onDelete={handleDelete}
+                  />
+                )
+              })}
             </div>
           )}
           </div>
@@ -469,5 +429,7 @@ export default function LibraryPage() {
     </>
   )
 }
+
+
 
 

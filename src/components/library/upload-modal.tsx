@@ -9,16 +9,22 @@ import {
 } from "@/components/ui/dialog"
 import { Upload, X, FileText, FileSpreadsheet } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
+import { postFetcher } from '@/lib/post-fetcher'
+import { Loader2 } from 'lucide-react'
 
 interface UploadModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onOptimisticUpdate?: (newDocuments: any[]) => void
 }
 
-export function UploadModal({ open, onOpenChange }: UploadModalProps) {
+export function UploadModal({ open, onOpenChange, onOptimisticUpdate }: UploadModalProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [files, setFiles] = useState<File[]>([])
   const [userSuggestion, setUserSuggestion] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [successCount, setSuccessCount] = useState<number>(0)
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -65,6 +71,109 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
     if (bytes < 1024) return bytes + ' B'
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  }
+
+  const getDocumentType = (file: File) => {
+    const name = file.name.toLowerCase()
+    if (name.endsWith('.pdf')) return 'PDF'
+    if (name.endsWith('.xlsx') || name.endsWith('.xls')) return 'Excel'
+    if (name.endsWith('.doc') || name.endsWith('.docx')) return 'Word'
+    return 'OTHER'
+  }
+
+  const getExtension = (file: File) => {
+    const idx = file.name.lastIndexOf('.')
+    return idx !== -1 ? file.name.substring(idx) : ''
+  }
+
+  const handleUpload = async () => {
+    if (files.length === 0) return
+    setIsUploading(true)
+    setError(null)
+    setSuccessCount(0)
+
+    const optimisticDocuments: any[] = []
+
+    try {
+      for (const file of files) {
+        // 1) Get signed URL
+        const signed = await postFetcher('/documents/get-upload-signed-url', {
+          file_name: file.name,
+        })
+        const uploadUrl = signed?.upload_url as string
+        const fileKey = signed?.file_key as string
+        if (!uploadUrl || !fileKey) {
+          throw new Error('Failed to get upload URL')
+        }
+
+        // 2) Upload the file to storage
+        const putResp = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': file.type || 'application/octet-stream',
+          },
+          body: file,
+        })
+        if (!putResp.ok) {
+          throw new Error(`Upload failed: ${putResp.statusText}`)
+        }
+
+        // 3) Register in DB
+        const payload = [
+          {
+            document_type: getDocumentType(file),
+            document_name: file.name,
+            user_suggestion: userSuggestion || null,
+            extension: getExtension(file),
+            document_size: file.size,
+            document_key: fileKey,
+          },
+        ]
+
+        try {
+          const response = await postFetcher('/add_documents', payload)
+          const documentIds = response?.document_ids || []
+          const documentId = documentIds[0] // Since we're uploading one at a time
+
+          // Create optimistic document object with the returned ID
+          optimisticDocuments.push({
+            document_id: documentId,
+            document_name: file.name,
+            document_type: getDocumentType(file),
+            processing_status: 'NOT_STARTED',
+            percentage_completion: 0,
+            document_size: file.size,
+            upload_date: new Date().toISOString(),
+            user_suggestion: userSuggestion || null,
+            extension: getExtension(file),
+            document_key: fileKey,
+          })
+
+          setSuccessCount((c) => c + 1)
+        } catch (dbErr) {
+          // Best-effort cleanup: attempt DELETE if supported by the same signed URL
+          try {
+            await fetch(uploadUrl, { method: 'DELETE' })
+          } catch (_) {
+            // ignore
+          }
+          throw dbErr instanceof Error ? dbErr : new Error('Failed to register document')
+        }
+      }
+
+      // All successful - optimistically update the UI
+      if (optimisticDocuments.length > 0) {
+        onOptimisticUpdate?.(optimisticDocuments)
+      }
+
+      setFiles([])
+      setUserSuggestion('')
+      onOpenChange(false)
+    } catch (e: any) {
+      setError(e?.message || 'Upload failed')
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   return (
@@ -179,20 +288,30 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
                   </div>
                 )}
 
+                {error && (
+                  <div className="mt-4 text-sm text-red-400">
+                    {error}
+                  </div>
+                )}
+
                 <div className="flex justify-end gap-3 mt-6">
                   <button
                     onClick={() => {
+                      if (isUploading) return
                       setFiles([])
                       setUserSuggestion('')
+                      setError(null)
                       onOpenChange(false)
                     }}
-                    className="px-4 py-2 text-sm text-white/60 hover:text-white/90 transition-colors cursor-pointer"
+                    className="px-4 py-2 text-sm text-white/60 hover:text-white/90 transition-colors cursor-pointer disabled:opacity-50"
+                    disabled={isUploading}
                   >
                     Cancel
                   </button>
                   <div className="relative group">
                     <button
-                      disabled={files.length === 0}
+                      onClick={handleUpload}
+                      disabled={files.length === 0 || isUploading}
                       className="relative px-4 py-2 text-sm bg-black/20 hover:bg-black/10 disabled:bg-black/40 disabled:opacity-50 disabled:cursor-not-allowed text-white/90 rounded-lg border border-white/30 transition-all duration-300 cursor-pointer overflow-hidden"
                     >
                       <div
@@ -201,8 +320,9 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
                           background: "radial-gradient(circle, rgba(59,130,246,0.25) 0%, rgba(37,99,235,0.12) 50%, rgba(29,78,216,0) 100%)"
                         }}
                       />
-                      <span className="relative z-10">
-                        Upload {files.length > 0 && `(${files.length})`}
+                      <span className="relative z-10 flex items-center gap-2">
+                        {isUploading && <Loader2 className="h-4 w-4 animate-spin" />}
+                        {isUploading ? `Uploading... ${successCount}/${files.length}` : `Upload ${files.length > 0 ? `(${files.length})` : ''}`}
                       </span>
                     </button>
                   </div>

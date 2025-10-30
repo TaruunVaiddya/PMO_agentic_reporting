@@ -171,16 +171,16 @@ export default function Page() {
 
       {/* Report Templates Section - Full Width */}
       <div className="w-full mt-16 px-6">
-        <div className="text-left mb-6">
-          <h2 className="text-xl font-medium text-white/90 mb-2">
-            Popular Report Templates
-          </h2>
-          <p className="text-white/50 text-sm">
-            Get started with pre-built templates for common business reports
-          </p>
-        </div>
-
         <div className="max-w-6xl mx-auto">
+          <div className="text-left mb-6">
+            <h2 className="text-xl font-medium text-white/90 mb-2">
+              Popular Report Templates
+            </h2>
+            <p className="text-white/50 text-sm">
+              Get started with pre-built templates for common business reports
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               {
