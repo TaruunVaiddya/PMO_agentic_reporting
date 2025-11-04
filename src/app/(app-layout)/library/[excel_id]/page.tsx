@@ -16,9 +16,6 @@ import {
   formatFileSize,
   formatRelativeTime
 } from '@/lib/excel-utils'
-import {
-  getMockDocument
-} from '@/lib/mock-data'
 
 export default function ExcelDetailsPage() {
   const params = useParams()
@@ -28,18 +25,71 @@ export default function ExcelDetailsPage() {
   const [selectedTable, setSelectedTable] = useState<ExtractedTable | null>(null)
   const [showPreview, setShowPreview] = useState(false)
   const [filterSheet, setFilterSheet] = useState<string>('all')
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false)
 
   // API state
   const [tables, setTables] = useState<ExtractedTable[]>([])
+  const [document, setDocument] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch tables from API
+  // Load document data from sessionStorage for instant display
   useEffect(() => {
     if (params.excel_id) {
-      fetchTables()
+      // Try to load from sessionStorage first for instant display
+      const cachedDoc = sessionStorage.getItem(`doc_${params.excel_id}`)
+      if (cachedDoc) {
+        try {
+          const docData = JSON.parse(cachedDoc)
+          setDocument(docData)
+          // Clean up after using
+          sessionStorage.removeItem(`doc_${params.excel_id}`)
+        } catch (e) {
+          console.error('Failed to parse cached document data')
+        }
+      }
+
+      // Then fetch fresh data from API
+      fetchDocumentData()
     }
   }, [params.excel_id])
+
+  const fetchDocumentData = async () => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      // Fetch tables data (should include document info in response)
+      const response = await fetcher(`/documents/${params.excel_id}/excel-tables`)
+
+      // Set document data if included in response (fallback for direct navigation/refresh)
+      if (response.document) {
+        setDocument(response.document)
+      }
+
+      // Map API data to ExtractedTable format
+      const tablesData = response.tables || []
+      const mappedTables: ExtractedTable[] = tablesData.map((table: any) => ({
+        table_id: table.table_id,
+        table_name: table.table_name,
+        sheet_name: table.sheet_name,
+        row_count: table.row_count,
+        column_count: table.column_count,
+        extraction_confidence: table.extraction_confidence,
+        has_headers: table.has_headers,
+        data_preview: [], // Will be loaded when preview is opened
+        extraction_status: table.extraction_status || 'NOT_STARTED'
+      }))
+
+      setTables(mappedTables)
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Failed to load data'
+      setError(errorMessage)
+      toast.error(errorMessage)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const fetchTables = async () => {
     setIsLoading(true)
@@ -59,7 +109,7 @@ export default function ExcelDetailsPage() {
         extraction_confidence: table.extraction_confidence,
         has_headers: table.has_headers,
         data_preview: [], // Will be loaded when preview is opened
-        extraction_status: table.extraction_status || 'extracted'
+        extraction_status: table.extraction_status || 'NOT_STARTED'
       }))
 
       setTables(mappedTables)
@@ -71,9 +121,6 @@ export default function ExcelDetailsPage() {
       setIsLoading(false)
     }
   }
-
-  // Mock document data for now - can be replaced with API call later
-  const document = getMockDocument(params.excel_id as string)
 
   // Get unique sheet names for filtering
   const sheetNames = Array.from(new Set(tables.map(t => t.sheet_name))).sort()
@@ -89,14 +136,46 @@ export default function ExcelDetailsPage() {
     return matchesSearch && matchesSheet
   })
 
-  const handleTablePreview = (table: ExtractedTable) => {
+  const handleTablePreview = async (table: ExtractedTable) => {
     setSelectedTable(table)
     setShowPreview(true)
+    setIsLoadingPreview(true)
+
+    try {
+      // Fetch preview data
+      const response = await fetcher(`/tables/${table.table_name}/preview`)
+
+      // Transform API response to match modal format
+      // Modal expects: [[headers...], [row1...], [row2...]]
+      const previewData = [
+        response.columns,
+        ...response.rows.map((row: any) =>
+          response.columns.map((col: string) => row[col])
+        )
+      ]
+
+      // Update the selected table with preview data
+      setSelectedTable({
+        ...table,
+        data_preview: previewData
+      })
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Failed to load preview'
+      toast.error(errorMessage)
+      // Keep the modal open but with empty preview
+      setSelectedTable({
+        ...table,
+        data_preview: []
+      })
+    } finally {
+      setIsLoadingPreview(false)
+    }
   }
 
   const handleClosePreview = () => {
     setShowPreview(false)
     setSelectedTable(null)
+    setIsLoadingPreview(false)
   }
 
   return (
@@ -125,12 +204,18 @@ export default function ExcelDetailsPage() {
                 </div>
 
                 <div>
-                  <h1 className="text-lg font-semibold text-white/90">{document.document_name}</h1>
+                  <h1 className="text-lg font-semibold text-white/90">
+                    {document ? document.document_name : 'Loading...'}
+                  </h1>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-white/60">{formatFileSize(document.document_size)}</span>
-                    <span className="text-xs text-white/40">•</span>
-                    <span className="text-xs text-white/60">{formatRelativeTime(document.upload_date)}</span>
-                    <span className="text-xs text-white/40">•</span>
+                    {document && (
+                      <>
+                        <span className="text-xs text-white/60">{formatFileSize(document.document_size)}</span>
+                        <span className="text-xs text-white/40">•</span>
+                        <span className="text-xs text-white/60">{formatRelativeTime(document.upload_date)}</span>
+                        <span className="text-xs text-white/40">•</span>
+                      </>
+                    )}
                     <span className="text-xs text-white/60">
                       {isLoading ? '...' : `${tables.length} table${tables.length !== 1 ? 's' : ''}`}
                     </span>
@@ -249,7 +334,7 @@ export default function ExcelDetailsPage() {
                     key={table.table_id}
                     table={table}
                     index={index}
-                    extractedCount={tables.filter(t => t.extraction_status === 'extracted').length}
+                    extractedCount={tables.filter(t => t.extraction_status === 'COMPLETED').length}
                     onPreview={handleTablePreview}
                   />
                 ))}
@@ -261,7 +346,7 @@ export default function ExcelDetailsPage() {
                     key={table.table_id}
                     table={table}
                     index={index}
-                    extractedCount={tables.filter(t => t.extraction_status === 'extracted').length}
+                    extractedCount={tables.filter(t => t.extraction_status === 'COMPLETED').length}
                     onPreview={handleTablePreview}
                   />
                 ))}

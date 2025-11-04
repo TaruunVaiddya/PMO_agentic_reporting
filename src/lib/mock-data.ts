@@ -29,7 +29,7 @@ export function getMockProcessedTables(): ExtractedTable[] {
       column_count: 12,
       extraction_confidence: 98.5,
       has_headers: true,
-      extraction_status: 'extracted',
+      extraction_status: 'COMPLETED',
       data_preview: [
         ['Date', 'Product', 'Region', 'Sales', 'Units', 'Revenue'],
         ['2024-08-01', 'Product A', 'North', '$45,230', '120', '$5,427,600'],
@@ -45,7 +45,7 @@ export function getMockProcessedTables(): ExtractedTable[] {
       column_count: 8,
       extraction_confidence: 95.2,
       has_headers: true,
-      extraction_status: 'extracted',
+      extraction_status: 'COMPLETED',
       data_preview: [
         ['Region', 'Q1 Sales', 'Q2 Sales', 'Q3 Sales', 'Growth %', 'Target'],
         ['North', '$1.2M', '$1.5M', '$1.8M', '+15%', '$2.0M'],
@@ -61,7 +61,7 @@ export function getMockProcessedTables(): ExtractedTable[] {
       column_count: 15,
       extraction_confidence: 99.1,
       has_headers: true,
-      extraction_status: 'extracted',
+      extraction_status: 'COMPLETED',
       data_preview: [
         ['SKU', 'Product Name', 'Category', 'Stock', 'Reorder Level', 'Unit Cost'],
         ['SKU-001', 'Widget Pro', 'Electronics', '450', '100', '$45.99'],
@@ -77,7 +77,7 @@ export function getMockProcessedTables(): ExtractedTable[] {
       column_count: 10,
       extraction_confidence: 92.8,
       has_headers: true,
-      extraction_status: 'extracted',
+      extraction_status: 'COMPLETED',
       data_preview: [
         ['Segment', 'Count', 'Avg Purchase', 'Frequency', 'LTV', 'Churn Rate'],
         ['Enterprise', '156', '$12,450', 'Monthly', '$298,800', '2.3%'],
@@ -93,7 +93,7 @@ export function getMockProcessedTables(): ExtractedTable[] {
       column_count: 11,
       extraction_confidence: 96.7,
       has_headers: true,
-      extraction_status: 'extracted',
+      extraction_status: 'COMPLETED',
       data_preview: [
         ['Employee ID', 'Name', 'Department', 'Performance', 'Rating', 'Bonus %'],
         ['EMP-001', 'John Smith', 'Sales', 'Exceeds', '4.8', '15%'],
@@ -109,7 +109,7 @@ export function getMockProcessedTables(): ExtractedTable[] {
       column_count: 13,
       extraction_confidence: 94.3,
       has_headers: true,
-      extraction_status: 'extracted',
+      extraction_status: 'COMPLETED',
       data_preview: [
         ['Supplier', 'Lead Time', 'On-Time %', 'Quality Score', 'Cost Index', 'Risk Level'],
         ['Supplier A', '14 days', '98.5%', '4.7/5', '0.92', 'Low'],
@@ -129,7 +129,7 @@ export function getMockCurrentlyProcessingTable(): ExtractedTable {
     column_count: 0,
     extraction_confidence: 0,
     has_headers: false,
-    extraction_status: 'pending',
+    extraction_status: 'PENDING',
     data_preview: []
   }
 }

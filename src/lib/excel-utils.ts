@@ -46,7 +46,7 @@ export function generateQueuePlaceholders(startId: number, count: number): Extra
     column_count: 0,
     extraction_confidence: 0,
     has_headers: false,
-    extraction_status: 'pending' as const,
+    extraction_status: 'PENDING' as const,
     data_preview: []
   }))
 }

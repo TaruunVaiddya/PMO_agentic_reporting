@@ -1,4 +1,4 @@
-import { Table, Loader2, CheckCircle, Clock, Eye, Download } from 'lucide-react'
+import { Table, Loader2, CheckCircle, Clock, Eye, Download, AlertCircle } from 'lucide-react'
 
 export interface ExtractedTable {
   table_id: string
@@ -9,7 +9,7 @@ export interface ExtractedTable {
   extraction_confidence: number
   has_headers: boolean
   data_preview: any[][]
-  extraction_status: 'pending' | 'extracted' | 'failed'
+  extraction_status: 'NOT_STARTED' | 'IN_QUEUE' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'PENDING'
 }
 
 interface TableCardProps {
@@ -20,19 +20,22 @@ interface TableCardProps {
 }
 
 export function TableCard({ table, index, extractedCount, onPreview }: TableCardProps) {
-  const isExtracted = table.extraction_status === 'extracted'
-  const isProcessing = table.extraction_status === 'pending' && index === extractedCount
-  const isInQueue = table.extraction_status === 'pending' && index > extractedCount
+  const isExtracted = table.extraction_status === 'COMPLETED'
+  const isProcessing = table.extraction_status === 'PROCESSING'
+  const isFailed = table.extraction_status === 'FAILED'
+  const isInQueue = table.extraction_status === 'IN_QUEUE' || table.extraction_status === 'PENDING' || table.extraction_status === 'NOT_STARTED'
 
   const getStatusIcon = () => {
     if (isProcessing) return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
     if (isExtracted) return <CheckCircle className="w-4 h-4 text-green-500" />
+    if (isFailed) return <AlertCircle className="w-4 h-4 text-red-500" />
     return <Clock className="w-4 h-4 text-white/30" />
   }
 
   const getCardStyles = () => {
     if (isExtracted) return 'bg-card hover:bg-white/5 border border-white/15 hover:border-white/20 cursor-pointer'
     if (isProcessing) return 'bg-blue-500/5 border border-blue-500/20'
+    if (isFailed) return 'bg-red-500/5 border border-red-500/20'
     return 'bg-white/[0.02] border border-white/5'
   }
 
@@ -96,6 +99,11 @@ export function TableCard({ table, index, extractedCount, onPreview }: TableCard
             <span>Status</span>
             <span className="text-blue-400">Analyzing structure...</span>
           </div>
+        ) : isFailed ? (
+          <div className="flex items-center justify-between">
+            <span>Status</span>
+            <span className="text-red-400">Extraction failed</span>
+          </div>
         ) : (
           <div className="flex items-center justify-between">
             <span>Status</span>
@@ -119,7 +127,7 @@ export function TableCard({ table, index, extractedCount, onPreview }: TableCard
         ) : (
           <div className="w-full flex justify-center">
             <span className="text-xs text-white/40">
-              {isProcessing ? 'Processing...' : 'Waiting in queue'}
+              {isProcessing ? 'Processing...' : isFailed ? 'Failed to extract' : 'Waiting in queue'}
             </span>
           </div>
         )}

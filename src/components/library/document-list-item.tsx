@@ -151,6 +151,14 @@ export function DocumentListItem({
 
   const handleItemClick = () => {
     if (documentType === 'Excel') {
+      // Store document data in sessionStorage for instant display
+      sessionStorage.setItem(`doc_${documentId}`, JSON.stringify({
+        document_id: documentId,
+        document_name: documentName,
+        document_size: documentSize,
+        upload_date: uploadDate,
+        document_type: documentType
+      }))
       router.push(`/library/${documentId}`)
     } else if (onClick) {
       onClick()

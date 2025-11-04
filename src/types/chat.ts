@@ -61,8 +61,20 @@ export type MetadataEvent = {
     };
 }
 
+export type ReportEvent = {
+    event: 'report';
+    data: {
+        id: string;
+        name?: string;
+        state: 'input-streaming' | 'input-available' | 'output-available' | 'output-error';
+        input?: any;
+        output?: string; // Complete HTML file as a string
+        errorText?: string;
+    };
+}
+
 // Union type for all possible events
-export type ContentEvent = ReasoningEvent | TaskEvent | ToolCallEvent | DeltaEvent | MetadataEvent;
+export type ContentEvent = ReasoningEvent | TaskEvent | ToolCallEvent | DeltaEvent | MetadataEvent | ReportEvent;
 
 // Chat message type
 export type ChatType = {

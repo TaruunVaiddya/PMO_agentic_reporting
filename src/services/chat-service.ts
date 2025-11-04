@@ -53,7 +53,7 @@ export default class SSEChatHandler {
             'Content-Type': 'application/json',
             'Accept': 'text/event-stream',
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             query: this.input,
             chat_id: this.chatId,
             session_id: this.sessionId,
@@ -62,22 +62,29 @@ export default class SSEChatHandler {
           }),
           signal: this.abortController.signal
         });
-  
+
         if (!response.ok) {
+          if (this.chatId) {
+            this.chatStore?.updateChatStatus(this.chatId, 'Failed');
+          }
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-  
+
         this.reader = response.body?.getReader() || null;
-        
+
         // Schedule periodic event processing
         this.scheduleEventProcessing();
-        
+
         await this.processStream();
-  
+
       } catch (error) {
         console.error('Chat error:', error);
+        // Update status to Failed if not already done
+        if (this.chatId) {
+          this.chatStore?.updateChatStatus(this.chatId, 'Failed');
+        }
         this.cleanup();
-        throw error;
+        // Don't throw error - let the UI handle the failed state
       }
     }
   
@@ -211,6 +218,19 @@ export default class SSEChatHandler {
             });
           } catch (parseError) {
             console.warn('Invalid task data:', data);
+          }
+          break;
+
+        case 'report':
+          try {
+            const reportData = JSON.parse(data);
+            // Append report event to pending events
+            this.pendingEvents.push({
+              event: 'report',
+              data: reportData
+            });
+          } catch (parseError) {
+            console.warn('Invalid report data:', data);
           }
           break;
 

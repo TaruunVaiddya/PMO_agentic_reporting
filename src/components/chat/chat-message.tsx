@@ -67,7 +67,8 @@ interface ChatMessageProps {
   onRetry: (messageId: string) => void;
   onLike: (messageId: string) => void;
   onDislike: (messageId: string) => void;
-  onPreviewClick?: (toolCall: ToolCallData) => void;
+  onPreviewClick?: (toolCall: ToolCallData, isAutoOpen?: boolean) => void;
+  onReportOutputUpdate?: (report: any) => void;
   status?: ChatStatus
 }
 
@@ -78,6 +79,7 @@ export const ChatMessage = React.memo(({
   onLike,
   onDislike,
   onPreviewClick,
+  onReportOutputUpdate,
   status
 }: ChatMessageProps) => {
   const isUser = message.sender === 'user';
@@ -89,7 +91,7 @@ export const ChatMessage = React.memo(({
 
     // Create ordered items that maintain the sequence of events
     const orderedItems: Array<{
-      type: 'reasoning' | 'tool_call' | 'task' | 'text';
+      type: 'reasoning' | 'tool_call' | 'task' | 'report' | 'text';
       idx: number;
       data: any;
     }> = [];
@@ -147,10 +149,10 @@ export const ChatMessage = React.memo(({
 
         case 'task':
           const existingTask = tasksMap.get(event.data.task.id);
-          const taskStatus: TaskStatus = event.data.task.status === 'error' 
-            ? 'failed' 
+          const taskStatus: TaskStatus = event.data.task.status === 'error'
+            ? 'failed'
             : event.data.task.status as TaskStatus;
-          
+
           if (existingTask) {
             existingTask.data = { ...existingTask.data, ...event.data.task, status: taskStatus };
           } else {
@@ -159,6 +161,23 @@ export const ChatMessage = React.memo(({
               type: 'task',
               idx,
               data: { id: event.data.task.id }
+            });
+          }
+          break;
+
+        case 'report':
+          // Track report and its first occurrence index
+          const existingReport = toolCallsMap.get(event.data.id);
+          if (existingReport) {
+            // Update existing report data
+            existingReport.data = { ...existingReport.data, ...event.data };
+          } else {
+            // First time seeing this report
+            toolCallsMap.set(event.data.id, { data: event.data, idx });
+            orderedItems.push({
+              type: 'report',
+              idx,
+              data: { id: event.data.id } // Placeholder, will be filled later
             });
           }
           break;
@@ -181,13 +200,18 @@ export const ChatMessage = React.memo(({
       });
     }
 
-    // Fill in the actual tool call and task data
+    // Fill in the actual tool call, report, and task data
     for (let i = 0; i < orderedItems.length; i++) {
       const item = orderedItems[i];
       if (item.type === 'tool_call') {
         const toolData = toolCallsMap.get(item.data.id);
         if (toolData) {
           item.data = toolData.data;
+        }
+      } else if (item.type === 'report') {
+        const reportData = toolCallsMap.get(item.data.id);
+        if (reportData) {
+          item.data = reportData.data;
         }
       } else if (item.type === 'task') {
         const taskData = tasksMap.get(item.data.id);
@@ -242,6 +266,17 @@ export const ChatMessage = React.memo(({
                   <TaskBlock
                     key={`task-${item.data.id}-${itemIdx}`}
                     task={item.data}
+                  />
+                );
+              }
+
+              if (item.type === 'report') {
+                return (
+                  <ReportBlock
+                    key={`report-${item.data.id}-${itemIdx}`}
+                    report={item.data}
+                    onPreviewClick={onPreviewClick}
+                    onReportOutputUpdate={onReportOutputUpdate}
                   />
                 );
               }
@@ -374,6 +409,40 @@ export const ChatMessage = React.memo(({
           )}
         </MessageContent>
 
+        {/* Streaming indicator - shown at the end when streaming */}
+        {isAssistant && message.isStreaming && status !== 'Failed' && (
+          <div className="flex items-center gap-1 mt-1 ml-2">
+            <div className="flex gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-white via-white/70 to-white/40 animate-bounce shadow-[0_0_4px_rgba(255,255,255,0.4)]" style={{ animationDelay: '0ms' }} />
+              <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-white via-white/70 to-white/40 animate-bounce shadow-[0_0_4px_rgba(255,255,255,0.4)]" style={{ animationDelay: '150ms' }} />
+              <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-white via-white/70 to-white/40 animate-bounce shadow-[0_0_4px_rgba(255,255,255,0.4)]" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Error indicator - shown when status is Failed */}
+        {isAssistant && status === 'Failed' && (
+          <div className="flex items-center gap-2 mt-2 ml-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+            <svg
+              className="w-4 h-4 text-red-500 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <div className="flex-1">
+              <p className="text-xs text-red-400 font-medium">Response generation failed</p>
+              <p className="text-xs text-white/60 mt-0.5">An error occurred. Please try again.</p>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <Actions className={cn(
           isUser
@@ -438,7 +507,7 @@ const ReasoningBlock = React.memo(({ data, status }: { data: any; status?: ChatS
   </div>
 ));
 
-const ToolCallBlock = React.memo(({ toolCall, onPreviewClick }: { toolCall: any; onPreviewClick?: (toolCall: any) => void }) => {
+const ToolCallBlock = React.memo(({ toolCall, onPreviewClick }: { toolCall: any; onPreviewClick?: (toolCall: any, isAutoOpen?: boolean) => void }) => {
   const toolTitle = toolCall.name === 'generate_preview' ? 'Dashboard Preview' : toolCall.name || 'Tool';
   
   return (
@@ -480,7 +549,7 @@ const ToolCallBlock = React.memo(({ toolCall, onPreviewClick }: { toolCall: any;
           {toolCall.state === 'output-available' && toolCall.name === 'generate_preview' && toolCall.output && (
             <div className="p-4 border-t">
               <button
-                onClick={() => onPreviewClick?.(toolCall)}
+                onClick={() => onPreviewClick?.(toolCall, false)}
                 className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
               >
                 <Monitor className="w-4 h-4" />
@@ -523,6 +592,98 @@ const TaskBlock = React.memo(({ task }: { task: any }) => (
   </div>
 ));
 
+const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate }: {
+  report: any;
+  onPreviewClick?: (report: any, isAutoOpen?: boolean) => void;
+  onReportOutputUpdate?: (report: any) => void;
+}) => {
+  const reportTitle = report.name || 'Web Report';
+  const isCompleted = report.state === 'output-available';
+  const isError = report.state === 'output-error';
+  const isStreaming = !isCompleted && !isError;
+  const hasAutoOpenedRef = React.useRef(false);
+  const hasUpdatedOutputRef = React.useRef(false);
+
+  // Auto-open preview when report event first appears
+  React.useEffect(() => {
+    const shouldAutoOpen = (report.state === 'input-streaming' || report.state === 'input-available')
+                          && onPreviewClick
+                          && !hasAutoOpenedRef.current;
+
+    if (shouldAutoOpen) {
+      hasAutoOpenedRef.current = true;
+      onPreviewClick(report, true); // Pass true to indicate this is an auto-open
+    }
+  }, [report.state, onPreviewClick]);
+
+  // Update preview when output becomes available
+  React.useEffect(() => {
+    if (isCompleted && report.output && onReportOutputUpdate && !hasUpdatedOutputRef.current) {
+      hasUpdatedOutputRef.current = true;
+      onReportOutputUpdate(report);
+    }
+  }, [isCompleted, report.output, onReportOutputUpdate, report]);
+
+  const getStatusInfo = () => {
+    if (isError) {
+      return { icon: <XCircleIcon className="size-5 text-red-500" />, text: 'Error', color: 'text-red-400' };
+    }
+    if (isCompleted) {
+      return { icon: <CheckCircleIcon className="size-5 text-green-500" />, text: 'Completed', color: 'text-green-400' };
+    }
+    return { icon: <ClockIcon className="size-5 text-blue-500 animate-pulse" />, text: 'Generating...', color: 'text-blue-400' };
+  };
+
+  const statusInfo = getStatusInfo();
+
+  const handleClick = () => {
+    if (isCompleted && onPreviewClick) {
+      onPreviewClick(report, false); // Manual click, not auto-open
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        "w-full rounded-lg border border-white/20 bg-muted/10 p-4 transition-all duration-200",
+        isCompleted && "cursor-pointer hover:border-primary/50 hover:bg-muted/30"
+      )}
+      onClick={handleClick}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 mt-1">
+          {statusInfo.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="font-semibold text-white text-sm">{reportTitle}</h3>
+            <span className={cn("text-xs", statusInfo.color)}>{statusInfo.text}</span>
+          </div>
+
+          {isStreaming && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Monitor className="w-4 h-4" />
+              <span>Preview opening automatically...</span>
+            </div>
+          )}
+
+          {isCompleted && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Monitor className="w-4 h-4" />
+              <span>Click to view report</span>
+            </div>
+          )}
+
+          {isError && report.errorText && (
+            <p className="text-xs text-red-400 mt-1">{report.errorText}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
 ReasoningBlock.displayName = 'ReasoningBlock';
 ToolCallBlock.displayName = 'ToolCallBlock';
-TaskBlock.displayName = 'TaskBlock'
+TaskBlock.displayName = 'TaskBlock';
+ReportBlock.displayName = 'ReportBlock';

@@ -1,4 +1,4 @@
-import { Table, Loader2, CheckCircle, Clock, Eye, Download, ChevronRight } from 'lucide-react'
+import { Table, Loader2, CheckCircle, Clock, Eye, Download, ChevronRight, AlertCircle } from 'lucide-react'
 import { ExtractedTable } from './table-card'
 
 interface TableListItemProps {
@@ -9,19 +9,22 @@ interface TableListItemProps {
 }
 
 export function TableListItem({ table, index, extractedCount, onPreview }: TableListItemProps) {
-  const isExtracted = table.extraction_status === 'extracted'
-  const isProcessing = table.extraction_status === 'pending' && index === extractedCount
-  const isInQueue = table.extraction_status === 'pending' && index > extractedCount
+  const isExtracted = table.extraction_status === 'COMPLETED'
+  const isProcessing = table.extraction_status === 'PROCESSING'
+  const isFailed = table.extraction_status === 'FAILED'
+  const isInQueue = table.extraction_status === 'IN_QUEUE' || table.extraction_status === 'PENDING' || table.extraction_status === 'NOT_STARTED'
 
   const getStatusIcon = () => {
     if (isProcessing) return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
     if (isExtracted) return <CheckCircle className="w-4 h-4 text-green-500" />
+    if (isFailed) return <AlertCircle className="w-4 h-4 text-red-500" />
     return <Clock className="w-4 h-4 text-white/30" />
   }
 
   const getItemStyles = () => {
     if (isExtracted) return 'bg-card hover:bg-white/5 border border-white/15 hover:border-white/20 cursor-pointer'
     if (isProcessing) return 'bg-blue-500/5 border border-blue-500/20'
+    if (isFailed) return 'bg-red-500/5 border border-red-500/20'
     return 'bg-white/[0.02] border border-white/5'
   }
 
@@ -76,6 +79,8 @@ export function TableListItem({ table, index, extractedCount, onPreview }: Table
               </>
             ) : isProcessing ? (
               <span className="text-blue-400">Analyzing structure...</span>
+            ) : isFailed ? (
+              <span className="text-red-400">Extraction failed</span>
             ) : (
               <span className="text-white/30">Waiting in queue</span>
             )}
@@ -96,7 +101,7 @@ export function TableListItem({ table, index, extractedCount, onPreview }: Table
           </>
         ) : (
           <span className="text-xs text-white/40 mr-4">
-            {isProcessing ? 'Processing...' : 'In queue'}
+            {isProcessing ? 'Processing...' : isFailed ? 'Failed' : 'In queue'}
           </span>
         )}
       </div>

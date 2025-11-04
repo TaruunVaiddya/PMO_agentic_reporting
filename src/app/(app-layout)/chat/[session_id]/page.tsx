@@ -34,6 +34,31 @@ interface ChatSessionPageProps {
 
 const ANIMATION_DURATION = 300;
 
+// Utility function to extract HTML from markdown code blocks or result field
+const extractHtmlContent = (output: any): string => {
+  let htmlContent = '';
+
+  // Check if output has a result field
+  if (output && typeof output === 'object' && output.result) {
+    htmlContent = output.result;
+  } else if (typeof output === 'string') {
+    htmlContent = output;
+  } else {
+    return '';
+  }
+
+  // Strip markdown code fences if present
+  // Matches: ```html\n...content...\n``` or ```\n...content...\n```
+  const codeBlockRegex = /^```(?:html)?\n?([\s\S]*?)\n?```$/;
+  const match = htmlContent.trim().match(codeBlockRegex);
+
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+
+  return htmlContent.trim();
+};
+
 export default function Page({ params }: ChatSessionPageProps) {
   const resolvedParams = React.use(params);
   const chatStore = useContext(ChatProviderContext);
@@ -93,23 +118,15 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
     css: '',
     js: '',
     title: '',
-    isVisible: false
+    isVisible: false,
+    reportId: null as string | null
   });
 
   const [useResizablePanels, setUseResizablePanels] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
-  useEffect(() => {
-    if (previewData.isVisible && !isClosing && !useResizablePanels) {
-      const timer = setTimeout(() => {
-        setUseResizablePanels(true);
-      }, ANIMATION_DURATION);
-
-      return () => clearTimeout(timer);
-    } else if ((isClosing || !previewData.isVisible) && useResizablePanels) {
-      setUseResizablePanels(false);
-    }
-  }, [previewData.isVisible, useResizablePanels, isClosing]);
+  // Track which report IDs have been auto-opened to prevent reopening
+  const autoOpenedReportsRef = React.useRef<Set<string>>(new Set());
 
   const handleCopy = (content: string) => {
     navigator.clipboard.writeText(content);
@@ -130,31 +147,107 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
     console.log('Dislike message:', messageId);
   };
 
-  const handlePreviewClick = (toolCall: ToolCallData) => {
+  const handlePreviewClick = React.useCallback((toolCallOrReport: ToolCallData | any, isAutoOpen: boolean = false) => {
+    const reportId = toolCallOrReport.id;
+
+    // If this is an auto-open, check if we should skip it
+    if (isAutoOpen) {
+      // Skip if preview is already visible
+      if (previewData.isVisible) {
+        return;
+      }
+      // Skip if this report has already been auto-opened
+      if (autoOpenedReportsRef.current.has(reportId)) {
+        return;
+      }
+      // Mark this report as auto-opened
+      autoOpenedReportsRef.current.add(reportId);
+    }
+
     collapse();
     setPreviewData(prev => ({ ...prev, isVisible: false }));
 
     setTimeout(() => {
-      setPreviewData({
-        html: toolCall.output?.html || '',
-        css: toolCall.output?.css || '',
-        js: toolCall.output?.js || '',
-        title: toolCall.output?.title || 'Dashboard Preview',
-        isVisible: true
-      });
+      const output = toolCallOrReport.output;
+
+      // Try to extract HTML content (handles result field and markdown code blocks)
+      const extractedHtml = extractHtmlContent(output);
+
+      if (extractedHtml) {
+        // This is a report with complete HTML (possibly from result field)
+        setPreviewData({
+          html: extractedHtml,
+          css: '',
+          js: '',
+          title: toolCallOrReport.name || 'Web Report',
+          isVisible: true,
+          reportId
+        });
+      } else if (output && typeof output === 'object' && (output.html || output.css || output.js)) {
+        // This is a tool call with separate html, css, js
+        setPreviewData({
+          html: output.html || '',
+          css: output.css || '',
+          js: output.js || '',
+          title: output.title || 'Dashboard Preview',
+          isVisible: true,
+          reportId
+        });
+      } else {
+        // No output yet (streaming just started) or fallback - show loading state
+        setPreviewData({
+          html: typeof output === 'string' ? output : '',
+          css: '',
+          js: '',
+          title: toolCallOrReport.name || 'Web Report',
+          isVisible: true,
+          reportId
+        });
+      }
+
     }, 50);
-  };
+  }, [collapse, previewData.isVisible]);
+
+  // Direct callback to update preview content when report output becomes available
+  const handleReportOutputUpdate = React.useCallback((report: any) => {
+    // Only update if this is the currently previewed report
+    if (!previewData.isVisible || previewData.reportId !== report.id) {
+      return;
+    }
+
+    const extractedHtml = extractHtmlContent(report.output);
+    if (extractedHtml) {
+      setPreviewData(prev => ({
+        ...prev,
+        html: extractedHtml,
+        title: report.name || prev.title
+      }));
+    }
+  }, [previewData.isVisible, previewData.reportId]);
 
   const handleClosePreview = () => {
     setIsClosing(true);
     setPreviewData(prev => ({
       ...prev,
-      isVisible: false
+      isVisible: false,
+      reportId: null
     }));
     setTimeout(() => {
       setIsClosing(false);
     }, 50);
   };
+
+  useEffect(() => {
+    if (previewData.isVisible && !isClosing && !useResizablePanels) {
+      const timer = setTimeout(() => {
+        setUseResizablePanels(true);
+      }, ANIMATION_DURATION);
+
+      return () => clearTimeout(timer);
+    } else if ((isClosing || !previewData.isVisible) && useResizablePanels) {
+      setUseResizablePanels(false);
+    }
+  }, [previewData.isVisible, useResizablePanels, isClosing]);
 
   const handleSubmit = async (message: PromptInputMessage) => {
     if (!chatStore) {
@@ -204,6 +297,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
                   onLike={handleLike}
                   onDislike={handleDislike}
                   onPreviewClick={handlePreviewClick}
+                  onReportOutputUpdate={handleReportOutputUpdate}
                 />
               ))
             )}
@@ -212,7 +306,12 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
         </Conversation>
       </div>
       <div className="bg-card/50 backdrop-blur-sm">
-        <div className="max-w-3xl mx-auto p-4">
+        <div className="max-w-3xl mx-auto p-4 pt-0">
+          {/* <div className=' w-full rounded-full bg-white/20 p-3'>
+
+          <p className=' text-white/65'>Please input text here</p>
+              
+          </div> */}
           <ChatInput
             onSubmit={handleSubmit}
             placeholder="Type a message..."

@@ -13,6 +13,7 @@ interface ChatMessageItemProps {
   onLike: (messageId: string) => void;
   onDislike: (messageId: string) => void;
   onPreviewClick?: (toolCall: any) => void;
+  onReportOutputUpdate?: (report: any) => void;
 }
 
 /**
@@ -25,7 +26,8 @@ const ChatMessageItem = React.memo(({
   onRetry,
   onLike,
   onDislike,
-  onPreviewClick
+  onPreviewClick,
+  onReportOutputUpdate
 }: ChatMessageItemProps) => {
   // Subscribe to this specific chat item
   const chatItem = useChatItem(chatId);
@@ -80,8 +82,11 @@ const ChatMessageItem = React.memo(({
   if (messages.length === 0) return null;
 
   // Check if we should show loading indicator
-  const shouldShowLoading = chatItem?.status === 'Not_Started' || 
+  const shouldShowLoading = chatItem?.status === 'Not_Started' ||
                              (chatItem?.userMessage && !chatItem?.assistantMessage);
+
+  // Check if we should show error message
+  const shouldShowError = chatItem?.status === 'Failed' && !chatItem?.assistantMessage;
 
   return (
     <>
@@ -94,10 +99,49 @@ const ChatMessageItem = React.memo(({
           onLike={onLike}
           onDislike={onDislike}
           onPreviewClick={onPreviewClick}
+          onReportOutputUpdate={onReportOutputUpdate}
           status={chatItem?.status}
         />
       ))}
       {shouldShowLoading && <ChatLoadingIndicator />}
+      {shouldShowError && (
+        <div className="flex items-start gap-4 p-6 animate-in fade-in duration-500">
+          {/* Avatar */}
+          <div className="flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-red-500/20 border border-red-500/50 flex items-center justify-center">
+              <svg
+                className="w-4 h-4 text-red-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+          </div>
+
+          {/* Error Message */}
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-red-400">Something went wrong</span>
+            </div>
+            <p className="text-sm text-white/70">
+              An error occurred while processing your request. Please try again after some time.
+            </p>
+            <button
+              onClick={() => onRetry(chatId)}
+              className="mt-2 text-xs text-white/50 hover:text-white/80 underline transition-colors"
+            >
+              Click here to retry
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }, (prevProps, nextProps) => {
