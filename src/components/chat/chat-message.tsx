@@ -505,7 +505,15 @@ const ReasoningBlock = React.memo(({ data, status }: { data: any; status?: ChatS
       <ReasoningContent>{data.content}</ReasoningContent>
     </Reasoning>
   </div>
-));
+), (prevProps, nextProps) => {
+  // Custom comparison to optimize re-renders
+  return (
+    prevProps.data.content === nextProps.data.content &&
+    prevProps.data.complete === nextProps.data.complete &&
+    prevProps.data.duration === nextProps.data.duration &&
+    prevProps.status === nextProps.status
+  );
+});
 
 const ToolCallBlock = React.memo(({ toolCall, onPreviewClick }: { toolCall: any; onPreviewClick?: (toolCall: any, isAutoOpen?: boolean) => void }) => {
   const toolTitle = toolCall.name === 'generate_preview' ? 'Dashboard Preview' : toolCall.name || 'Tool';
@@ -561,6 +569,16 @@ const ToolCallBlock = React.memo(({ toolCall, onPreviewClick }: { toolCall: any;
       </Tool>
     </div>
   );
+}, (prevProps, nextProps) => {
+  // Custom comparison to optimize re-renders
+  return (
+    prevProps.toolCall.id === nextProps.toolCall.id &&
+    prevProps.toolCall.name === nextProps.toolCall.name &&
+    prevProps.toolCall.state === nextProps.toolCall.state &&
+    prevProps.toolCall.input === nextProps.toolCall.input &&
+    prevProps.toolCall.output === nextProps.toolCall.output &&
+    prevProps.toolCall.errorText === nextProps.toolCall.errorText
+  );
 });
 
 const TaskBlock = React.memo(({ task }: { task: any }) => (
@@ -590,7 +608,16 @@ const TaskBlock = React.memo(({ task }: { task: any }) => (
       </TaskContent>
     </Task>
   </div>
-));
+), (prevProps, nextProps) => {
+  // Custom comparison to optimize re-renders
+  return (
+    prevProps.task.id === nextProps.task.id &&
+    prevProps.task.title === nextProps.task.title &&
+    prevProps.task.status === nextProps.task.status &&
+    prevProps.task.description === nextProps.task.description &&
+    JSON.stringify(prevProps.task.files) === JSON.stringify(nextProps.task.files)
+  );
+});
 
 const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate }: {
   report: any;
@@ -617,12 +644,13 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate }
   }, [report.state, onPreviewClick]);
 
   // Update preview when output becomes available
+  // Only depend on report.id and report.output to minimize re-renders
   React.useEffect(() => {
     if (isCompleted && report.output && onReportOutputUpdate && !hasUpdatedOutputRef.current) {
       hasUpdatedOutputRef.current = true;
       onReportOutputUpdate(report);
     }
-  }, [isCompleted, report.output, onReportOutputUpdate, report]);
+  }, [isCompleted, report.output, onReportOutputUpdate, report.id, report]);
 
   const getStatusInfo = () => {
     if (isError) {
@@ -680,6 +708,16 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate }
         </div>
       </div>
     </div>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison to optimize re-renders
+  // Only re-render if critical report properties change
+  return (
+    prevProps.report.id === nextProps.report.id &&
+    prevProps.report.state === nextProps.report.state &&
+    prevProps.report.output === nextProps.report.output &&
+    prevProps.report.name === nextProps.report.name &&
+    prevProps.report.errorText === nextProps.report.errorText
   );
 });
 

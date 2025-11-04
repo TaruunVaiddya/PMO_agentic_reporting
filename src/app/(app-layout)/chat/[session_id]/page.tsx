@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useContext } from 'react';
-import { ChatInput } from '@/components/chat/chat-input';
+import { ChatInputPill } from '@/components/chat/chat-input-pill';
 import ChatMessageItem from '@/components/chat/chat-message-item';
 import { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import {
@@ -35,6 +35,7 @@ interface ChatSessionPageProps {
 const ANIMATION_DURATION = 300;
 
 // Utility function to extract HTML from markdown code blocks or result field
+// Moved outside component to prevent recreation on every render
 const extractHtmlContent = (output: any): string => {
   let htmlContent = '';
 
@@ -128,6 +129,12 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
   // Track which report IDs have been auto-opened to prevent reopening
   const autoOpenedReportsRef = React.useRef<Set<string>>(new Set());
 
+  // Use ref to track preview state to avoid callback recreation
+  const previewDataRef = React.useRef(previewData);
+  React.useEffect(() => {
+    previewDataRef.current = previewData;
+  }, [previewData]);
+
   const handleCopy = (content: string) => {
     navigator.clipboard.writeText(content);
   };
@@ -152,8 +159,8 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
 
     // If this is an auto-open, check if we should skip it
     if (isAutoOpen) {
-      // Skip if preview is already visible
-      if (previewData.isVisible) {
+      // Skip if preview is already visible (use ref to avoid dependency)
+      if (previewDataRef.current.isVisible) {
         return;
       }
       // Skip if this report has already been auto-opened
@@ -206,12 +213,14 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
       }
 
     }, 50);
-  }, [collapse, previewData.isVisible]);
+  }, [collapse]);
 
   // Direct callback to update preview content when report output becomes available
+  // Using ref to avoid dependency on previewData, preventing unnecessary callback recreations
   const handleReportOutputUpdate = React.useCallback((report: any) => {
-    // Only update if this is the currently previewed report
-    if (!previewData.isVisible || previewData.reportId !== report.id) {
+    // Only update if this is the currently previewed report (use ref to avoid dependency)
+    const currentPreviewData = previewDataRef.current;
+    if (!currentPreviewData.isVisible || currentPreviewData.reportId !== report.id) {
       return;
     }
 
@@ -223,7 +232,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
         title: report.name || prev.title
       }));
     }
-  }, [previewData.isVisible, previewData.reportId]);
+  }, []);
 
   const handleClosePreview = () => {
     setIsClosing(true);
@@ -307,14 +316,9 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
       </div>
       <div className="bg-card/50 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto p-4 pt-0">
-          {/* <div className=' w-full rounded-full bg-white/20 p-3'>
-
-          <p className=' text-white/65'>Please input text here</p>
-              
-          </div> */}
-          <ChatInput
+          <ChatInputPill
             onSubmit={handleSubmit}
-            placeholder="Type a message..."
+            placeholder="Ask anything"
           />
         </div>
       </div>
