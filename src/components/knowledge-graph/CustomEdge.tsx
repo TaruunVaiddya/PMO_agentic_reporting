@@ -46,13 +46,13 @@ export const CustomEdge: React.FC<EdgeProps> = ({
 
   const handleBlur = () => {
     setIsEditing(false);
-    edgeData?.onLabelChange?.(id, edgeLabel);
+    edgeData?.onLabelChange?.(id, String(edgeLabel || ''));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       setIsEditing(false);
-      edgeData?.onLabelChange?.(id, edgeLabel);
+      edgeData?.onLabelChange?.(id, String(edgeLabel || ''));
     } else if (e.key === "Escape") {
       setIsEditing(false);
       setEdgeLabel(label);
@@ -65,7 +65,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
     strokeWidth: 2,
     strokeDasharray: "none",
     fill: "none",
-    pointerEvents: "none", // prevents flicker when connecting
+    pointerEvents: "none" as const, // prevents flicker when connecting
     ...style,
   };
 
@@ -86,7 +86,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
           {isEditing ? (
             <input
               type="text"
-              value={edgeLabel}
+              value={String(edgeLabel || '')}
               onChange={(e) => setEdgeLabel(e.target.value)}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}

@@ -195,81 +195,31 @@ export const WebPreviewUrl: React.FC<WebPreviewUrlProps> = ({
 // WebPreviewBody Component
 export interface WebPreviewBodyProps {
   src?: string;
-  html?: string;
-  css?: string;
-  js?: string;
+  htmlContent?: string; // Complete HTML document string
   className?: string;
 }
 
 export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
   src,
-  html,
-  css,
-  js,
+  htmlContent,
   className,
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { setIsLoading } = useWebPreview();
 
-  const generateDocument = () => {
-    if (!html && !css && !js) return '';
-
-    // Check if html is already a complete HTML document
-    const isCompleteDocument = html?.trim().toLowerCase().startsWith('<!doctype html>');
-
-    if (isCompleteDocument) {
-      // Return the complete HTML as-is
-      return html || '';
-    }
-
-    // Otherwise, build a document with html, css, and js parts
-    return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Preview</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 20px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #ffffff;
-      color: #000000;
-      line-height: 1.5;
-    }
-    ${css || ''}
-  </style>
-</head>
-<body>
-  ${html || ''}
-  <script>
-    try {
-      ${js || ''}
-    } catch (error) {
-      console.error('JavaScript Error:', error);
-    }
-  </script>
-</body>
-</html>`;
-  };
-
   const [iframeSrcDoc, setIframeSrcDoc] = React.useState<string>('');
 
   useEffect(() => {
     if (src) {
+      // If src is provided, clear srcDoc to use src instead
       setIframeSrcDoc('');
-    } else if (html || css || js) {
-      const docContent = generateDocument();
-      if (docContent) {
-        setIframeSrcDoc(docContent);
-      }
+    } else if (htmlContent) {
+      // Use the complete HTML directly - no processing needed!
+      setIframeSrcDoc(htmlContent);
     }
-  }, [html, css, js, src]);
+  }, [htmlContent, src]);
 
-  const hasContent = !!(html || css || js || src);
+  const hasContent = !!(htmlContent || src);
 
   return (
     <div className={cn('flex-1 bg-muted/20 overflow-hidden relative', className)}>

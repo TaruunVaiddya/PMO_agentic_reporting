@@ -10,36 +10,19 @@ import { RotateCcw, ExternalLink, X } from 'lucide-react';
 
 interface WebPreviewControlsProps {
   title: string;
-  html: string;
-  css: string;
-  js: string;
+  htmlContent: string; // Complete HTML document
   onReload?: () => void;
   onClose?: () => void;
 }
 
 export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
   title,
-  html,
-  css,
-  js,
+  htmlContent,
   onReload,
   onClose,
 }) => {
   const handleOpenInNewTab = () => {
-    const htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Preview</title>
-  <style>${css}</style>
-</head>
-<body>
-  ${html}
-  <script>${js}</script>
-</body>
-</html>`;
-
+    // Use the complete HTML directly
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');

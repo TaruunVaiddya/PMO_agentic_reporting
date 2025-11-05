@@ -40,7 +40,8 @@
       "Bash(cat:*)",
       "Bash(python:*)",
       "WebFetch(domain:reactflow.dev)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "WebFetch(domain:react-mentions.vercel.app)"
     ],
     "deny": [],
     "ask": []

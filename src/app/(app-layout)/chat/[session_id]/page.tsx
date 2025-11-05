@@ -115,9 +115,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
   }, [allChatIds]);
   
   const [previewData, setPreviewData] = useState({
-    html: '',
-    css: '',
-    js: '',
+    htmlContent: '', // Store complete HTML directly
     title: '',
     isVisible: false,
     reportId: null as string | null
@@ -171,48 +169,34 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
       autoOpenedReportsRef.current.add(reportId);
     }
 
-    collapse();
-    setPreviewData(prev => ({ ...prev, isVisible: false }));
+    const output = toolCallOrReport.output;
+    const extractedHtml = extractHtmlContent(output);
 
-    setTimeout(() => {
-      const output = toolCallOrReport.output;
+    // Check if we're clicking the same report that's already open
+    const isSameReport = previewDataRef.current.isVisible && previewDataRef.current.reportId === reportId;
 
-      // Try to extract HTML content (handles result field and markdown code blocks)
-      const extractedHtml = extractHtmlContent(output);
-
+    if (isSameReport) {
+      // Same report - just update content without closing/reopening
       if (extractedHtml) {
-        // This is a report with complete HTML (possibly from result field)
-        setPreviewData({
-          html: extractedHtml,
-          css: '',
-          js: '',
-          title: toolCallOrReport.name || 'Web Report',
-          isVisible: true,
-          reportId
-        });
-      } else if (output && typeof output === 'object' && (output.html || output.css || output.js)) {
-        // This is a tool call with separate html, css, js
-        setPreviewData({
-          html: output.html || '',
-          css: output.css || '',
-          js: output.js || '',
-          title: output.title || 'Dashboard Preview',
-          isVisible: true,
-          reportId
-        });
-      } else {
-        // No output yet (streaming just started) or fallback - show loading state
-        setPreviewData({
-          html: typeof output === 'string' ? output : '',
-          css: '',
-          js: '',
-          title: toolCallOrReport.name || 'Web Report',
-          isVisible: true,
-          reportId
-        });
+        setPreviewData(prev => ({
+          ...prev,
+          htmlContent: extractedHtml,
+          title: toolCallOrReport.name || prev.title
+        }));
       }
+      return; // Don't close and reopen
+    }
 
-    }, 50);
+    // Different report or first open - collapse sidebar and show preview
+    collapse();
+
+    // Directly set preview data without closing first (removes blank screen)
+    setPreviewData({
+      htmlContent: extractedHtml || '',
+      title: toolCallOrReport.name || 'Web Report',
+      isVisible: true,
+      reportId
+    });
   }, [collapse]);
 
   // Direct callback to update preview content when report output becomes available
@@ -228,7 +212,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
     if (extractedHtml) {
       setPreviewData(prev => ({
         ...prev,
-        html: extractedHtml,
+        htmlContent: extractedHtml,
         title: report.name || prev.title
       }));
     }
@@ -331,15 +315,11 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
     <WebPreview style={{ height: '100%' }}>
       <WebPreviewControls
         title={previewData.title}
-        html={previewData.html}
-        css={previewData.css}
-        js={previewData.js}
+        htmlContent={previewData.htmlContent}
         onClose={handleClosePreview}
       />
       <WebPreviewBody
-        html={previewData.html}
-        css={previewData.css}
-        js={previewData.js}
+        htmlContent={previewData.htmlContent}
       />
     </WebPreview>
   );
