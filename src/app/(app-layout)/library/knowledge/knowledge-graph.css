@@ -1,0 +1,55 @@
+/* Knowledge Graph Customizations */
+
+/* Enhance edge visibility on hover and selection */
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3px;
+}
+
+/* Solid edges - no animation */
+.react-flow__edge .react-flow__edge-path {
+  stroke-dasharray: none;
+}
+
+/* Hide arrow heads */
+.react-flow__arrowhead {
+  display: none;
+}
+
+marker {
+  display: none;
+}
+
+/* Connection handle styling - always visible, dimmed colors */
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+  border-radius: 50%;
+  z-index: 10;
+}
+
+.react-flow__node:hover .react-flow__handle {
+  width: 12px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Dark mode controls */
+.react-flow__controls {
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.react-flow__controls-button {
+  background: rgba(0, 0, 0, 0.6);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.react-flow__controls-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}

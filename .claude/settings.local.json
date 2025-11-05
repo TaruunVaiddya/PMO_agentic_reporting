@@ -38,7 +38,9 @@
       "Bash(sort:*)",
       "Bash(xargs ls:*)",
       "Bash(cat:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "WebFetch(domain:reactflow.dev)",
+      "Bash(kill:*)"
     ],
     "deny": [],
     "ask": []

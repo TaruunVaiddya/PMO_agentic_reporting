@@ -15,10 +15,11 @@ import { Loader2 } from 'lucide-react'
 interface UploadModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  collectionId?: string | null
   onOptimisticUpdate?: (newDocuments: any[]) => void
 }
 
-export function UploadModal({ open, onOpenChange, onOptimisticUpdate }: UploadModalProps) {
+export function UploadModal({ open, onOpenChange, collectionId, onOptimisticUpdate }: UploadModalProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [files, setFiles] = useState<File[]>([])
   const [userSuggestion, setUserSuggestion] = useState('')
@@ -127,6 +128,7 @@ export function UploadModal({ open, onOpenChange, onOptimisticUpdate }: UploadMo
             extension: getExtension(file),
             document_size: file.size,
             document_key: fileKey,
+            ...(collectionId && { collection_id: collectionId }),
           },
         ]
 
