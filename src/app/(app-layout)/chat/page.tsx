@@ -39,7 +39,8 @@ export default function Page() {
         input: message.text || '',
         sessionId,
         selected_agent: selectedAgent,
-        is_new_chat: true
+        is_new_chat: true,
+        collection_id:message.collection_id
       });
 
       // Start the chat and navigate to session page

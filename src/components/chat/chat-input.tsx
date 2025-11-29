@@ -28,6 +28,11 @@ interface Collection {
   updated_at: string;
 }
 
+interface CollectionPosition {
+  start: number;
+  end: number;
+}
+
 interface ChatInputProps {
   onSubmit: (message: PromptInputMessage) => void;
   placeholder?: string;
@@ -46,6 +51,8 @@ export function ChatInput({
   const [selectedMode, setSelectedMode] = useState<ChatMode>(null);
   const [showCollectionMenu, setShowCollectionMenu] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
+  // NEW STATE to track position
+  const [collectionTagPosition, setCollectionTagPosition] = useState<CollectionPosition | null>(null); 
   const [collectionMenuPosition, setCollectionMenuPosition] = useState(0);
   const [shouldFocus, setShouldFocus] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -68,16 +75,20 @@ export function ChatInput({
     const value = e.target.value;
     setInputValue(value);
 
-    // Check if user just typed "/" at the start or after a space
+    // If the input value changes outside of the key handler, the position might be invalid.
+    // For simplicity, we assume if the collection tag is present, its position is what we stored.
+    // In a more complex scenario, you'd re-verify the position here.
+
+    // Check if user just typed "@" at the start or after a space
     const cursorPosition = e.target.selectionStart;
     const textBeforeCursor = value.substring(0, cursorPosition);
-    const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
+    const lastAtSymbolIndex = textBeforeCursor.lastIndexOf('@');
 
-    // Only show menu if "/" is the last character typed and is at start or after a space
-    if (lastSlashIndex !== -1 && lastSlashIndex === cursorPosition - 1) {
-      const charBeforeSlash = lastSlashIndex > 0 ? value[lastSlashIndex - 1] : ' ';
-      if (charBeforeSlash === ' ' || lastSlashIndex === 0) {
-        setCollectionMenuPosition(lastSlashIndex);
+    // Only show menu if "@" is the last character typed and is at start or after a space
+    if (lastAtSymbolIndex !== -1 && lastAtSymbolIndex === cursorPosition - 1) {
+      const charBeforeAt = lastAtSymbolIndex > 0 ? value[lastAtSymbolIndex - 1] : ' ';
+      if (charBeforeAt === ' ' || lastAtSymbolIndex === 0) {
+        setCollectionMenuPosition(lastAtSymbolIndex);
         setShowCollectionMenu(true);
       } else {
         setShowCollectionMenu(false);
@@ -90,14 +101,73 @@ export function ChatInput({
   const handleCollectionSelect = (collection: Collection) => {
     setSelectedCollection(collection);
 
-    // Replace the "/" with the collection name
-    const beforeSlash = inputValue.substring(0, collectionMenuPosition);
-    const afterSlash = inputValue.substring(collectionMenuPosition + 1);
-    const newValue = `${beforeSlash}/${collection.name} ${afterSlash}`;
+    // Replace the "@" with the collection name, followed by a space
+    const collectionTag = `@${collection.name} `;
+    const beforeAt = inputValue.substring(0, collectionMenuPosition);
+    const afterAt = inputValue.substring(collectionMenuPosition + 1);
+    const newValue = `${beforeAt}${collectionTag}${afterAt}`;
 
     setInputValue(newValue);
     setShowCollectionMenu(false);
-    setShouldFocus(true);
+
+    // Store the new position of the collection tag
+    const start = collectionMenuPosition;
+    const end = start + collectionTag.length;
+    setCollectionTagPosition({ start, end });
+    
+    setShouldFocus(true); // Focus logic will set cursor to the very end
+  };
+
+  const handleRemoveCollection = (cursorPosition?: number) => {
+    if (selectedCollection && collectionTagPosition) {
+      // 1. Remove the text from the input
+      const beforeTag = inputValue.substring(0, collectionTagPosition.start);
+      // We assume the collection tag is followed by a space, so we find the end of the tag content
+      const afterTagContentStart = collectionTagPosition.end; 
+      const afterTag = inputValue.substring(afterTagContentStart);
+      
+      let newValue = `${beforeTag}${afterTag}`;
+
+      // Trim extra spaces if they were at the boundaries
+      if (newValue.length > 0 && newValue[newValue.length - 1] === ' ') {
+        newValue = newValue.trimEnd();
+      }
+
+      // 2. Reset the state
+      setSelectedCollection(null);
+      setCollectionTagPosition(null);
+      setInputValue(newValue);
+
+      // 3. Adjust cursor position if necessary (optional but good for UX)
+      if (textareaRef.current) {
+        const newCursorPosition = collectionTagPosition.start;
+        // The focus effect might run later, so we use a flag to handle it, but for a
+        // direct key handler, setting selection range immediately is more reliable.
+        setTimeout(() => {
+          if (textareaRef.current) {
+             textareaRef.current.focus();
+             textareaRef.current.setSelectionRange(newCursorPosition, newCursorPosition);
+          }
+        }, 0);
+      }
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Backspace' && selectedCollection && collectionTagPosition) {
+      const textarea = e.target as HTMLTextAreaElement;
+      const cursorPosition = textarea.selectionStart;
+
+      // Logic: If the cursor is immediately after the tag (at 'end')
+      // OR anywhere within the tag (between 'start' and 'end'), delete the whole tag.
+      const isAtEndOfTag = cursorPosition === collectionTagPosition.end;
+      const isWithinTag = cursorPosition > collectionTagPosition.start && cursorPosition <= collectionTagPosition.end;
+
+      if (isAtEndOfTag || isWithinTag) {
+        e.preventDefault(); // Stop the default character deletion
+        handleRemoveCollection(cursorPosition);
+      }
+    }
   };
 
   // Handle focusing after collection selection
@@ -105,12 +175,19 @@ export function ChatInput({
     if (shouldFocus) {
       const textarea = containerRef.current?.querySelector('textarea');
       if (textarea) {
+        textareaRef.current = textarea; // Store the ref here for key down logic
         // Focus and set cursor at the end
         textarea.focus();
         const position = inputValue.length;
         textarea.setSelectionRange(position, position);
       }
       setShouldFocus(false);
+    } else {
+      // Ensure the ref is up-to-date even if shouldFocus isn't active
+      const textarea = containerRef.current?.querySelector('textarea');
+      if (textarea) {
+        textareaRef.current = textarea;
+      }
     }
   }, [shouldFocus, inputValue]);
 
@@ -123,11 +200,12 @@ export function ChatInput({
       const messageWithMode = {
         ...message,
         mode: selectedMode,
-        collection: selectedCollection
+        collection_id: selectedCollection?.id ?? null
       };
       await onSubmit(messageWithMode);
       setInputValue('');
       setSelectedCollection(null);
+      setCollectionTagPosition(null); // Reset position on submit
     } catch (error) {
       console.error('Error submitting message:', error);
     } finally {
@@ -153,6 +231,25 @@ export function ChatInput({
 
   return (
     <div className="relative" ref={containerRef}>
+      {/* Selected Collection Tag placed at Top Right (Absolute Positioning) */}
+      {selectedCollection && (
+        <div className="absolute -top-10 right-0 z-10 p-2"> 
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-xs text-white/70 shadow-lg">
+            <FolderOpen className="w-3 h-3" />
+            <span className="font-medium">Collection:</span>
+            <span>{selectedCollection.name}</span>
+            <button
+              onClick={() => handleRemoveCollection()}
+              className="ml-1 hover:text-white/90 transition-colors focus:outline-none"
+              type="button"
+              aria-label="Remove selected collection"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       <PromptInput
         onSubmit={handleSubmit}
         className={`border border-white/15 bg-black/40 backdrop-blur-sm rounded-2xl overflow-hidden shadow-2xl divide-white/15 ${className}`}
@@ -173,6 +270,8 @@ export function ChatInput({
           <PromptInputTextarea
             value={inputValue}
             onChange={handleInputChange}
+            onKeyDown={handleKeyDown} // ADDED: Keydown handler for backspace
+            ref={textareaRef} // ADDED: Direct ref for selection range manipulation
             placeholder={placeholder}
             className="text-white/90 placeholder:text-white/40 text-base bg-transparent"
             disabled={disabled}
@@ -213,28 +312,6 @@ export function ChatInput({
                 <MessageCircleQuestion className="h-3.5 w-3.5" />
                 <span>Data Q&A</span>
               </MetallicButton>
-
-              {selectedCollection && (
-                <>
-                  <div className="w-px h-6 bg-white/10 mx-1"></div>
-                  <div className="flex items-center gap-1.5 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-xs text-white/70">
-                    <FolderOpen className="w-3 h-3" />
-                    <span>{selectedCollection.name}</span>
-                    <button
-                      onClick={() => {
-                        setSelectedCollection(null);
-                        // Remove the collection name from input
-                        const collectionPattern = new RegExp(`/${selectedCollection.name}\\s*`, 'g');
-                        setInputValue(inputValue.replace(collectionPattern, ''));
-                      }}
-                      className="ml-1 hover:text-white/90 transition-colors"
-                      type="button"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </>
-              )}
             </div>
           </PromptInputTools>
           <PromptInputSubmit

@@ -340,9 +340,9 @@ export default function CollectionNetworkPage() {
             <ArrowLeft className="w-5 h-5 text-white/80" />
           </button>
           <div>
-            <h1 className="text-2xl font-semibold text-white/90 flex items-center gap-2">
+            <h1 className="text-lg font-semibold text-white/90 flex items-center gap-2">
               <Network className="w-6 h-6" />
-              Collection Network
+              Collection Ontology
             </h1>
           </div>
         </div>

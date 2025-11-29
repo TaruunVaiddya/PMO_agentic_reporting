@@ -7,6 +7,7 @@ export interface ChatServiceConfig {
   sessionId?: string | null;
   selected_agent?: string | null;
   is_new_chat?: boolean | false;
+  collection_id?:string | null;
 }
 
 export default class SSEChatHandler {
@@ -24,6 +25,7 @@ export default class SSEChatHandler {
     private sessionId: string | null;
     private selected_agent: string | null;
     private is_new_chat: boolean | false;
+    private collection_id: string | null;
 
     constructor(config: ChatServiceConfig) {
       this.chatStore = config.chatStore;
@@ -31,6 +33,7 @@ export default class SSEChatHandler {
       this.sessionId = config.sessionId || null;
       this.selected_agent = config.selected_agent || null;
       this.is_new_chat = config.is_new_chat || false;
+      this.collection_id = config.collection_id || null
     }
    
     private getId(): string {
@@ -59,6 +62,7 @@ export default class SSEChatHandler {
             session_id: this.sessionId,
             selected_agent: this.selected_agent,
             is_new_session: this.is_new_chat,
+            collection_id:this.collection_id
           }),
           signal: this.abortController.signal
         });

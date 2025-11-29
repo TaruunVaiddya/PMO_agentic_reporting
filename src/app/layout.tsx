@@ -1,6 +1,15 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/auth-provider";
+// 1. Import Nunito_Sans (Note the underscore for multi-word font names)
+import { Nunito_Sans } from "next/font/google";
+
+// 2. Define your font variable
+const nunitoSans = Nunito_Sans({
+  subsets: ["latin"],
+  display: "swap", // Recommended for performance (prevents text-blocking)
+  variable: "--font-nunito-sans", // Optional: CSS variable for Tailwind
+});
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -13,7 +22,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="min-h-screen max-h-screen overflow-hidden">
+    <html
+      lang="en"
+      // 3. Apply the font class and optional variable to the <html> element
+      className={`${nunitoSans.className} min-h-screen max-h-screen overflow-hidden ${nunitoSans.variable}`}
+    >
       <body className="antialiased bg-black h-full">
         <AuthProvider>
           {children}

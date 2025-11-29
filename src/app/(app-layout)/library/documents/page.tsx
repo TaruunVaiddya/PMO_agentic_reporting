@@ -226,7 +226,7 @@ function LibraryPageContent() {
                 onClick={() => router.push('/library/knowledge')}
               >
                 <Network className="w-4 h-4" />
-                <span>Knowledge Graph</span>
+                <span>Collection Ontology</span>
               </MetallicButton>
 
               <MetallicButton type="button" onClick={() => setShowUploadModal(true)}>
