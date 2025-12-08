@@ -7,16 +7,14 @@ import { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import {
   Conversation,
   ConversationContent,
-  ConversationEmptyState,
   ConversationScrollButton
 } from '@/components/ai-elements/conversation';
 import {
   WebPreview,
   WebPreviewBody
 } from '@/components/ai-elements/web-preview-vercel';
-import { WebPreviewControls } from '@/components/ai-elements/web-preview-controls';
+import { WebPreviewControls, PreviewMode } from '@/components/ai-elements/web-preview-controls';
 import { useSidebar } from '@/contexts/sidebar-context';
-import { MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 import useChatIds from '@/hooks/chat-store-hooks/use-chat-ids';
@@ -25,6 +23,8 @@ import SSEChatHandler from '@/services/chat-service';
 import type { ToolCallData } from '@/components/chat/chat-message';
 import { ChatListType, ChatStoreType } from '@/types/chat';
 import { fetcher } from '@/lib/get-fetcher';
+import { useEditMode } from '@/hooks/use-edit-mode';
+import { EditPanel } from '@/components/editor/edit-panel';
 
 interface ChatSessionPageProps {
   params: Promise<{
@@ -108,12 +108,12 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
   const { collapse } = useSidebar();
   // Get all chat IDs for this session using the hook
   const allChatIds = useChatIds();
-  
+
   // Deduplicate chat IDs to prevent React key errors
   const chatIds = React.useMemo(() => {
     return Array.from(new Set(allChatIds));
   }, [allChatIds]);
-  
+
   const [previewData, setPreviewData] = useState({
     htmlContent: '', // Store complete HTML directly
     title: '',
@@ -126,6 +126,89 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
 
   // Track which report IDs have been auto-opened to prevent reopening
   const autoOpenedReportsRef = React.useRef<Set<string>>(new Set());
+
+  // Store iframe ref for applying edits
+  const iframeRef = React.useRef<HTMLIFrameElement | null>(null);
+
+  // Edit mode functionality - uses default config from library
+  const { enableEditMode, disableEditMode, selectedElement, clearSelection } = useEditMode({
+    onElementSelected: (element) => {
+      console.log('Selected element:', element);
+    },
+  });
+
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('view');
+
+  // Handle mode change
+  const handleModeChange = React.useCallback(
+    (newMode: PreviewMode) => {
+      setPreviewMode(newMode);
+      // Clear selection when switching modes
+      if (newMode === 'view') {
+        clearSelection();
+      }
+    },
+    [clearSelection]
+  );
+
+  // Handle iframe ready for edit mode
+  const handleEditModeReady = React.useCallback(
+    async (iframe: HTMLIFrameElement) => {
+      iframeRef.current = iframe;
+      if (previewMode === 'edit') {
+        await enableEditMode(iframe);
+      } else {
+        disableEditMode(iframe);
+      }
+    },
+    [previewMode, enableEditMode, disableEditMode]
+  );
+
+  // Watch for preview mode changes and enable/disable edit mode accordingly
+  React.useEffect(() => {
+    if (!iframeRef.current) return;
+
+    if (previewMode === 'edit') {
+      enableEditMode(iframeRef.current);
+    } else {
+      disableEditMode(iframeRef.current);
+      clearSelection();
+    }
+  }, [previewMode, enableEditMode, disableEditMode, clearSelection]);
+
+  // Handle property updates from edit panel
+  const handlePropertyUpdate = React.useCallback(
+    (property: string, value: string) => {
+      if (!iframeRef.current?.contentWindow) return;
+
+      try {
+        iframeRef.current.contentWindow.postMessage({
+          type: 'APPLY_STYLE',
+          property,
+          value
+        }, '*');
+      } catch (error) {
+        console.error('Failed to apply style:', error);
+      }
+    },
+    []
+  );
+
+  // Handle reset element (single element only)
+  const handleResetElement = React.useCallback(
+    () => {
+      if (!iframeRef.current?.contentWindow) return;
+
+      try {
+        iframeRef.current.contentWindow.postMessage({
+          type: 'RESET_ELEMENT'
+        }, '*');
+      } catch (error) {
+        console.error('Failed to reset element:', error);
+      }
+    },
+    []
+  );
 
   // Use ref to track preview state to avoid callback recreation
   const previewDataRef = React.useRef(previewData);
@@ -249,15 +332,12 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
     }
 
     try {
-      // Get selected agent from session storage (if any)
-      const selectedAgent = sessionStorage.getItem('selected-agent') || null;
-
       // Create SSE handler with the config object
       const sseHandler = new SSEChatHandler({
         chatStore,
         input: message.text || '',
         sessionId: session_id,
-        selected_agent: selectedAgent
+        selected_agent: message.mode,
       });
 
       // Start the chat (SSE handler will update the store)
@@ -274,13 +354,8 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
         <Conversation className="w-full h-full overflow-y-auto custom-scrollbar">
           <ConversationContent className="max-w-3xl mx-auto">
             {chatIds.length === 0 ? (
-              <ConversationEmptyState
-                icon={<MessageSquare className="size-12" />}
-                title="No messages yet"
-                description="Start a conversation to see messages here. I can help you analyze Excel and PDF files, generate reports, and answer questions about your data."
-              />
+              <></>
             ) : (
-              // Render memoized message items - only re-render when their specific chat ID updates
               chatIds.map((chatId) => (
                 <ChatMessageItem
                   key={chatId}
@@ -309,6 +384,24 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
     </>
   );
 
+  // Handle close button in edit panel - switch back to view mode
+  const handleCloseEditPanel = React.useCallback(() => {
+    setPreviewMode('view');
+    clearSelection();
+  }, [clearSelection]);
+
+  // Show edit panel in edit mode, chat otherwise
+  const leftPanelContent = previewMode === 'edit' ? (
+    <EditPanel
+      selectedElement={selectedElement}
+      onUpdate={handlePropertyUpdate}
+      onReset={handleResetElement}
+      onClose={handleCloseEditPanel}
+    />
+  ) : (
+    chatContent
+  );
+
   const shouldShowPreview = previewData.isVisible || isClosing;
 
   const previewContent = shouldShowPreview && (
@@ -316,10 +409,14 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
       <WebPreviewControls
         title={previewData.title}
         htmlContent={previewData.htmlContent}
+        mode={previewMode}
+        onModeChange={handleModeChange}
         onClose={handleClosePreview}
       />
       <WebPreviewBody
         htmlContent={previewData.htmlContent}
+        editMode={previewMode === 'edit'}
+        onEditModeReady={handleEditModeReady}
       />
     </WebPreview>
   );
@@ -329,7 +426,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
       {useResizablePanels && previewData.isVisible && !isClosing ? (
         <PanelGroup direction="horizontal" className="h-full">
           <Panel defaultSize={30} minSize={30} maxSize={70} className="flex flex-col">
-            {chatContent}
+            {leftPanelContent}
           </Panel>
 
           <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize relative group">
@@ -346,7 +443,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
             "flex flex-col transition-all duration-300 ease-in-out",
             shouldShowPreview ? "w-[30%]" : "w-full"
           )}>
-            {chatContent}
+            {leftPanelContent}
           </div>
 
           {shouldShowPreview && (

@@ -41,7 +41,8 @@
       "Bash(python:*)",
       "WebFetch(domain:reactflow.dev)",
       "Bash(kill:*)",
-      "WebFetch(domain:react-mentions.vercel.app)"
+      "WebFetch(domain:react-mentions.vercel.app)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": []

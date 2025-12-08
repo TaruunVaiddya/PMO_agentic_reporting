@@ -197,17 +197,22 @@ export interface WebPreviewBodyProps {
   src?: string;
   htmlContent?: string; // Complete HTML document string
   className?: string;
+  editMode?: boolean; // Enable edit mode
+  onEditModeReady?: (iframe: HTMLIFrameElement) => void; // Callback when iframe is ready for editing
 }
 
 export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
   src,
   htmlContent,
   className,
+  editMode = false,
+  onEditModeReady,
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { setIsLoading } = useWebPreview();
 
   const [iframeSrcDoc, setIframeSrcDoc] = React.useState<string>('');
+  const editModeAppliedRef = useRef(false);
 
   useEffect(() => {
     if (src) {
@@ -217,6 +222,36 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
       // Use the complete HTML directly - no processing needed!
       setIframeSrcDoc(htmlContent);
     }
+  }, [htmlContent, src]);
+
+  // Handle edit mode changes
+  useEffect(() => {
+    if (!iframeRef.current) return;
+
+    const iframe = iframeRef.current;
+
+    if (editMode && !editModeAppliedRef.current) {
+      // Wait for iframe content to be ready
+      const enableEditMode = async () => {
+        // Add a small delay to ensure iframe content is fully loaded
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        if (iframe.contentDocument?.readyState === 'complete') {
+          onEditModeReady?.(iframe);
+          editModeAppliedRef.current = true;
+        }
+      };
+
+      enableEditMode();
+    } else if (!editMode && editModeAppliedRef.current) {
+      // Reset flag when edit mode is disabled
+      editModeAppliedRef.current = false;
+    }
+  }, [editMode, iframeSrcDoc, onEditModeReady]);
+
+  // Reset edit mode flag when content changes
+  useEffect(() => {
+    editModeAppliedRef.current = false;
   }, [htmlContent, src]);
 
   const hasContent = !!(htmlContent || src);

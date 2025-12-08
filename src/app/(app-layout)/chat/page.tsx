@@ -29,16 +29,22 @@ export default function Page() {
     try {
       // Generate a unique session ID
       const sessionId = generateUniqueId();
+
+      // session details store in session storage
+      sessionStorage.setItem('session-details-' + sessionId, JSON.stringify({
+        selected_mode: message.mode || null,
+        collection_id: message.collection_id || null
+      }));
       
       // Get selected agent from session storage (if any)
-      const selectedAgent = sessionStorage.getItem('selected-agent') || null;
+      // const selectedAgent = sessionStorage.getItem('selected-agent') || null;
 
       // Create SSE handler with the new config object
       const sseHandler = new SSEChatHandler({
         chatStore,
         input: message.text || '',
         sessionId,
-        selected_agent: selectedAgent,
+        selected_agent: message.mode,
         is_new_chat: true,
         collection_id:message.collection_id
       });
@@ -85,7 +91,7 @@ export default function Page() {
       sseHandler.startChat();
       
       // Navigate to the chat session page
-      router.push(`/chat/${sessionId}`);
+      router.push(`/chat/${sessionId}?chat=new`);
     } catch (error) {
       console.error('Failed to start chat:', error);
       // You might want to show an error message to the user here

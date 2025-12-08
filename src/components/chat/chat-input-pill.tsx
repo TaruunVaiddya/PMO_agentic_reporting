@@ -4,7 +4,7 @@ import React, { useState, useRef } from 'react';
 import {
   PromptInputMessage
 } from '@/components/ai-elements/prompt-input';
-import { Globe, FileText, MessageCircleQuestion, Plus, Send, Loader2 } from 'lucide-react';
+import { Globe, FileText, MessageCircleQuestion, Plus, Send, Loader2, Binoculars } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export type ChatMode = 'web-search' | 'report-generation' | 'data-qa' | null;
+export type ChatMode = 'web-search' | 'report-generation' | 'data-qa' | 'deep-research' | null;
 
 interface ChatInputPillProps {
   onSubmit: (message: PromptInputMessage) => void;
@@ -90,6 +90,8 @@ export function ChatInputPill({
         return <FileText className="h-4 w-4" />;
       case 'data-qa':
         return <MessageCircleQuestion className="h-4 w-4" />;
+      case 'deep-research':
+        return <Binoculars className="h-4 w-4" />;
       default:
         return null;
     }
@@ -103,6 +105,8 @@ export function ChatInputPill({
         return 'Report';
       case 'data-qa':
         return 'Data Q&A';
+      case 'deep-research':
+        return 'Deep Research';
       default:
         return null;
     }
@@ -180,6 +184,20 @@ export function ChatInputPill({
               <MessageCircleQuestion className="h-4 w-4" />
               <span>Data Q&A</span>
               {selectedMode === 'data-qa' && (
+                <div className="ml-auto w-2 h-2 rounded-full bg-blue-500" />
+              )}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleModeSelect('deep-research')}
+              className={cn(
+                "cursor-pointer flex items-center gap-2 px-3 py-2.5",
+                "text-white/90 hover:!bg-white/10 hover:!text-white focus:!bg-white/10 focus:!text-white",
+                selectedMode === 'data-qa' && "bg-white/5"
+              )}
+            >
+              <Binoculars className="h-4 w-4" />
+              <span>Deep Research</span>
+              {selectedMode === 'deep-research' && (
                 <div className="ml-auto w-2 h-2 rounded-full bg-blue-500" />
               )}
             </DropdownMenuItem>

@@ -16,7 +16,9 @@ import {
   Star,
   Trash2,
   CheckCircle,
-  XCircle
+  XCircle,
+  PanelLeft,
+  PanelLeftClose
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -301,9 +303,28 @@ export function AppSidebar({
         "h-[calc(100vh-3rem)] bg-background flex flex-col transition-all duration-300 overflow-hidden relative",
         isCollapsed ? "w-16" : "w-64"
       )}>
+        {/* Sidebar Toggle Button */}
+        <div className={cn(
+          "flex items-center p-3 border-b border-border/50",
+          isCollapsed ? "justify-center" : "justify-end"
+        )}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggle}
+            className="h-8 w-8 rounded-md hover:bg-accent transition-colors"
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isCollapsed ? (
+              <PanelLeft className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
 
         {/* Top Navigation */}
-      <div className="p-3 mt-2 space-y-1">
+      <div className="p-3 space-y-1">
         {navItems.map((item, index) => (
           <Button
             key={index}

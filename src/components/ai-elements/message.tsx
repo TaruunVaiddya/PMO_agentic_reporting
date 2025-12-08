@@ -31,11 +31,11 @@ const messageContentVariants = cva(
         contained: [
           "max-w-[100%] px-4 py-2.5 rounded-2xl",
           // User message - black/white theme
-          "group-[.is-user]:bg-white/10 group-[.is-user]:text-white",
+          "group-[.is-user]:bg-white/10 group-[.is-user]:text-white/90",
           "group-[.is-user]:border group-[.is-user]:border-white/20",
           // Assistant message - gray theme
           "group-[.is-assistant]:bg-gray-100 dark:group-[.is-assistant]:bg-transparent",
-          "group-[.is-assistant]:text-gray-900 dark:group-[.is-assistant]:text-white/90",
+          "group-[.is-assistant]:text-gray-900 dark:group-[.is-assistant]:text-[#E0E0E0]",
           "group-[.is-assistant]:border-none group-[.is-assistant]:border-gray-200 dark:group-[.is-assistant]:border-zinc-700",
         ],
         flat: [

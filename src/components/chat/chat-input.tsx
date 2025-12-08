@@ -12,12 +12,12 @@ import {
   PromptInputSubmit,
   PromptInputMessage
 } from '@/components/ai-elements/prompt-input';
-import { Globe, FileText, MessageCircleQuestion, FolderOpen } from 'lucide-react';
+import { Globe, FileText, MessageCircleQuestion, FolderOpen, Binoculars } from 'lucide-react';
 import { MetallicButton } from '@/components/ui/metallic-button';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/get-fetcher';
 
-export type ChatMode = 'web-search' | 'report-generation' | 'data-qa' | null;
+export type ChatMode = 'web-search' | 'report-generation' | 'data-qa' | 'deep-research' | null;
 
 interface Collection {
   id: string;
@@ -75,16 +75,11 @@ export function ChatInput({
     const value = e.target.value;
     setInputValue(value);
 
-    // If the input value changes outside of the key handler, the position might be invalid.
-    // For simplicity, we assume if the collection tag is present, its position is what we stored.
-    // In a more complex scenario, you'd re-verify the position here.
 
-    // Check if user just typed "@" at the start or after a space
     const cursorPosition = e.target.selectionStart;
     const textBeforeCursor = value.substring(0, cursorPosition);
     const lastAtSymbolIndex = textBeforeCursor.lastIndexOf('@');
 
-    // Only show menu if "@" is the last character typed and is at start or after a space
     if (lastAtSymbolIndex !== -1 && lastAtSymbolIndex === cursorPosition - 1) {
       const charBeforeAt = lastAtSymbolIndex > 0 ? value[lastAtSymbolIndex - 1] : ' ';
       if (charBeforeAt === ' ' || lastAtSymbolIndex === 0) {
@@ -101,7 +96,6 @@ export function ChatInput({
   const handleCollectionSelect = (collection: Collection) => {
     setSelectedCollection(collection);
 
-    // Replace the "@" with the collection name, followed by a space
     const collectionTag = `@${collection.name} `;
     const beforeAt = inputValue.substring(0, collectionMenuPosition);
     const afterAt = inputValue.substring(collectionMenuPosition + 1);
@@ -110,12 +104,11 @@ export function ChatInput({
     setInputValue(newValue);
     setShowCollectionMenu(false);
 
-    // Store the new position of the collection tag
     const start = collectionMenuPosition;
     const end = start + collectionTag.length;
     setCollectionTagPosition({ start, end });
     
-    setShouldFocus(true); // Focus logic will set cursor to the very end
+    setShouldFocus(true); 
   };
 
   const handleRemoveCollection = (cursorPosition?: number) => {
@@ -311,6 +304,17 @@ export function ChatInput({
               >
                 <MessageCircleQuestion className="h-3.5 w-3.5" />
                 <span>Data Q&A</span>
+              </MetallicButton>
+
+               <MetallicButton
+                type="button"
+                onClick={() => handleModeToggle('deep-research')}
+                isActive={selectedMode === 'deep-research'}
+                variant="compact"
+                disabled={disabled}
+              >
+                <Binoculars className="h-3.5 w-3.5" />
+                <span>Deep Research</span>
               </MetallicButton>
             </div>
           </PromptInputTools>
