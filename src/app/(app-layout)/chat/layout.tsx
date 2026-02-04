@@ -13,7 +13,7 @@ function ChatLayoutContent({ children }: { children: React.ReactNode }) {
       <SidebarWrapper />
       <div className='flex-1 flex flex-col pr-3 pb-3 pl-1'>
         <div className='w-full h-full rounded-lg overflow-hidden dark bg-card border border-white/10 relative'>
-          <div className='flex items-start absolute top-2 left-2'>
+          <div className='flex items-start absolute top-2 left-2 z-40'>
             <SidebarToggle />
           </div>
           <ChatStoreProvider>
