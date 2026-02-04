@@ -8,6 +8,8 @@ interface TextControlProps {
   onChange: (value: string) => void;
   multiline?: boolean;
   placeholder?: string;
+  rows?: number;
+  type?: string;
 }
 
 export const TextControl = React.memo(function TextControl({
@@ -15,7 +17,9 @@ export const TextControl = React.memo(function TextControl({
   value,
   onChange,
   multiline = false,
-  placeholder = ''
+  placeholder = '',
+  rows = 3,
+  type = 'text'
 }: TextControlProps) {
   return (
     <div className="space-y-1.5">
@@ -25,12 +29,12 @@ export const TextControl = React.memo(function TextControl({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          rows={3}
+          rows={rows}
           className="w-full px-2 py-1.5 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary resize-none"
         />
       ) : (
         <input
-          type="text"
+          type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}

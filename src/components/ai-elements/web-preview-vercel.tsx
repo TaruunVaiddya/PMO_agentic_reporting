@@ -219,8 +219,45 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
       // If src is provided, clear srcDoc to use src instead
       setIframeSrcDoc('');
     } else if (htmlContent) {
-      // Use the complete HTML directly - no processing needed!
-      setIframeSrcDoc(htmlContent);
+      // Inject custom scrollbar styles into the HTML content
+      const customScrollbarStyles = `
+        <style>
+          * {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+          }
+          *::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+          }
+          *::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          *::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            transition: background 0.2s ease;
+          }
+          *::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+          }
+          *::-webkit-scrollbar-button {
+            display: none;
+          }
+        </style>
+      `;
+
+      // Inject styles into the head of the HTML document
+      let modifiedHtml = htmlContent;
+      if (htmlContent.includes('</head>')) {
+        modifiedHtml = htmlContent.replace('</head>', `${customScrollbarStyles}</head>`);
+      } else if (htmlContent.includes('<html>')) {
+        modifiedHtml = htmlContent.replace('<html>', `<html><head>${customScrollbarStyles}</head>`);
+      } else {
+        modifiedHtml = `<!DOCTYPE html><html><head>${customScrollbarStyles}</head><body>${htmlContent}</body></html>`;
+      }
+
+      setIframeSrcDoc(modifiedHtml);
     }
   }, [htmlContent, src]);
 

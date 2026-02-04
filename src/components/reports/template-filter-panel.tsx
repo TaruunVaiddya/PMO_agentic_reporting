@@ -8,6 +8,7 @@ interface TemplateFilterPanelProps {
 export function TemplateFilterPanel({ filterCategory, onFilterChange }: TemplateFilterPanelProps) {
   const categoryOptions = [
     { value: 'all' as const, label: 'All' },
+    { value: 'custom' as const, label: 'Custom' },
     { value: 'business' as const, label: 'Business' },
     { value: 'finance' as const, label: 'Finance' },
     { value: 'operations' as const, label: 'Operations' },

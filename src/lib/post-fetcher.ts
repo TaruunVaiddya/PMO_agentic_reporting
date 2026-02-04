@@ -1,9 +1,10 @@
+import { fetchWithAuth } from './fetch-with-auth'
+
 export const postFetcher = async (path: string, data: any) => {
     let response: Response
     try {
-      response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
+      response = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
         method: "POST",
-        credentials:'include',
         headers: {
           "Content-Type": "application/json",
         },
@@ -14,7 +15,7 @@ export const postFetcher = async (path: string, data: any) => {
         ? networkError
         : new Error("Network error while fetching")
     }
-  
+
     if (!response.ok) {
       const bodyText = await response.json()
       // Handle structured error objects from backend
@@ -30,7 +31,7 @@ export const postFetcher = async (path: string, data: any) => {
 
       throw new Error(errorMessage)
     }
-  
+
     try {
       return await response.json()
     } catch (parseError) {

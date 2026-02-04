@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Search } from 'lucide-react'
 import { ReportGrid } from '@/components/reports/report-grid'
@@ -10,17 +10,61 @@ import { BackButton } from '@/components/ui/back-button'
 import { SearchBar } from '@/components/ui/search-bar'
 import { FilterButton } from '@/components/ui/filter-button'
 import { EmptyState } from '@/components/ui/empty-state'
-import { REPORT_TEMPLATES, TemplateCategory } from '@/lib/constants/report-templates'
+import { REPORT_TEMPLATES, TemplateCategory, TemplateData } from '@/lib/constants/report-templates'
 import { useSearchFilter } from '@/hooks/use-search-filter'
+import { fetcher } from '@/lib/get-fetcher'
+
+interface CustomTemplateResponse {
+  id: string
+  created_at: string
+  name: string
+  thumbnail_url: string
+  description: string
+  template_url: string
+}
 
 export default function ReportTemplates() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCategory, setFilterCategory] = useState<TemplateCategory>('all')
   const [showFilters, setShowFilters] = useState(false)
+  const [customTemplates, setCustomTemplates] = useState<TemplateData[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Fetch custom templates on mount
+  useEffect(() => {
+    const fetchCustomTemplates = async () => {
+      try {
+        setIsLoading(true)
+        const response: CustomTemplateResponse[] = await fetcher('/report-templates')
+
+        // Transform API response to match TemplateData structure
+        const transformedTemplates: TemplateData[] = response.map(template => ({
+          id: template.id,
+          name: template.name,
+          description: template.description,
+          thumbnail: template.thumbnail_url,
+          color: 'from-white/10 to-white/5', // Default color for custom templates
+          category: 'custom' // Mark as custom template
+        }))
+
+        setCustomTemplates(transformedTemplates)
+      } catch (error) {
+        console.error('Failed to fetch custom templates:', error)
+        setCustomTemplates([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchCustomTemplates()
+  }, [])
+
+  // Combine custom templates (first) with default templates
+  const allTemplates = [...customTemplates, ...REPORT_TEMPLATES]
 
   const filteredTemplates = useSearchFilter({
-    items: REPORT_TEMPLATES,
+    items: allTemplates,
     searchQuery,
     searchFields: ['name', 'description'],
     filterField: 'category',
@@ -57,7 +101,7 @@ export default function ReportTemplates() {
 
           <MetallicButton onClick={() => router.push('/chat')}>
             <Plus className="w-4 h-4" />
-            <span>Create Custom</span>
+            <span>Upload Custom</span>
           </MetallicButton>
         </div>
 
@@ -70,7 +114,7 @@ export default function ReportTemplates() {
         )}
 
         {/* Results count */}
-        {(searchQuery || filterCategory !== 'all') && (
+        {!isLoading && (searchQuery || filterCategory !== 'all') && (
           <div className="mb-4 text-sm text-white/60 flex-shrink-0">
             Found {filteredTemplates.length} template{filteredTemplates.length !== 1 ? 's' : ''}
             {searchQuery && ` matching "${searchQuery}"`}
@@ -79,7 +123,14 @@ export default function ReportTemplates() {
 
         {/* Scrollable content area */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {filteredTemplates.length > 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-white/80 animate-spin" />
+                <p className="text-sm text-white/60">Loading templates...</p>
+              </div>
+            </div>
+          ) : filteredTemplates.length > 0 ? (
             <div className="pb-6">
               <ReportGrid
                 reports={filteredTemplates}

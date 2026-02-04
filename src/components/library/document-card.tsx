@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { postFetcher } from '@/lib/post-fetcher'
 import { useState, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
+import { fetchWithAuth } from '@/lib/fetch-with-auth'
 
 interface DocumentCardProps {
   documentId: string
@@ -59,9 +60,8 @@ export function DocumentCard({
     setIsDeleting(true)
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/documents/${documentId}`, {
+      const response = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/documents/${documentId}`, {
         method: 'DELETE',
-        credentials: 'include',
       })
 
       if (!response.ok) {

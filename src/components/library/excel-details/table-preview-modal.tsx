@@ -12,7 +12,7 @@ export function TablePreviewModal({ table, isOpen, onClose }: TablePreviewModalP
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="relative w-full max-w-6xl max-h-[90vh] bg-gray-900/95 border border-white/20 rounded-xl overflow-hidden">
+      <div className="relative w-full max-w-6xl max-h-[90vh] bg-black/95 backdrop-blur-md border border-white/15 rounded-xl overflow-hidden">
         <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-black/50 backdrop-blur-sm border-b border-white/10">
           <div className="flex items-center gap-3">
             <Table className="w-5 h-5 text-white/60" />

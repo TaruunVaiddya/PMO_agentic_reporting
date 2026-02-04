@@ -1,13 +1,14 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   WebPreviewNavigation,
   WebPreviewNavigationButton,
   WebPreviewUrl,
 } from './web-preview-vercel';
-import { RotateCcw, ExternalLink, X, Edit3, Eye } from 'lucide-react';
+import { RotateCcw, ExternalLink, X, Edit3, Eye, Download, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import html2pdf from 'html2pdf.js';
 
 export type PreviewMode = 'view' | 'edit';
 
@@ -28,12 +29,60 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
   onReload,
   onClose,
 }) => {
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
   const handleOpenInNewTab = () => {
     // Use the complete HTML directly
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
     setTimeout(() => URL.revokeObjectURL(url), 100);
+  };
+
+  const handleDownloadPDF = async () => {
+    setIsGeneratingPDF(true);
+
+    try {
+      // Create a temporary container to render the HTML
+      const container = document.createElement('div');
+      container.innerHTML = htmlContent;
+
+      // Extract just the body content for PDF generation
+      const bodyContent = container.querySelector('body')?.innerHTML || htmlContent;
+
+      // Create a wrapper div with the content
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = bodyContent;
+      wrapper.style.padding = '20px';
+      wrapper.style.backgroundColor = 'white';
+
+      // PDF generation options
+      const options = {
+        margin: [10, 10, 10, 10] as [number, number, number, number],
+        filename: `${title || 'report'}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff'
+        },
+        jsPDF: {
+          unit: 'mm' as const,
+          format: 'a4' as const,
+          orientation: 'portrait' as const
+        }
+      };
+
+      // Generate and download PDF
+      await html2pdf().set(options).from(wrapper).save();
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   return (
@@ -80,6 +129,17 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
           </button>
         </div>
 
+        <WebPreviewNavigationButton
+          tooltip={isGeneratingPDF ? "Generating PDF..." : "Download as PDF"}
+          onClick={handleDownloadPDF}
+          disabled={isGeneratingPDF}
+        >
+          {isGeneratingPDF ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Download className="size-4" />
+          )}
+        </WebPreviewNavigationButton>
         <WebPreviewNavigationButton
           tooltip="Open in new tab"
           onClick={handleOpenInNewTab}

@@ -1,5 +1,6 @@
 import generateUniqueId from '@/lib/get_unique_id';
 import type { ContentEvent } from '@/types/chat';
+import { fetchWithAuth } from '@/lib/fetch-with-auth';
 
 export interface ChatServiceConfig {
   chatStore: any;
@@ -49,9 +50,8 @@ export default class SSEChatHandler {
       }, this.chatId, 'user');
 
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
+        const response = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
           method: 'POST',
-          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'text/event-stream',

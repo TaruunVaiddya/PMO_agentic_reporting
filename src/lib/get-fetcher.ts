@@ -1,9 +1,10 @@
+import { fetchWithAuth } from './fetch-with-auth'
+
 export const fetcher = async (path: string) => {
     let response: Response
     try {
-      response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
+      response = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
         method: "GET",
-        credentials: "include", // This should be at the top level, not in headers
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
@@ -14,7 +15,7 @@ export const fetcher = async (path: string) => {
         ? networkError
         : new Error("Network error while fetching")
     }
-  
+
     if (!response.ok) {
       const bodyText = await response.json()
       // Handle both string and object detail formats
@@ -30,7 +31,7 @@ export const fetcher = async (path: string) => {
       }
       throw new Error(errorMessage)
     }
-  
+
     try {
       return await response.json()
     } catch (parseError) {

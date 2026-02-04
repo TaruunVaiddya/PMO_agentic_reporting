@@ -1,6 +1,6 @@
 "use client"
 
-import { Settings, LogOut, UserIcon, CreditCard, Library, MessageSquare } from 'lucide-react'
+import { Settings, LogOut, UserIcon, CreditCard, Library, MessageSquare, PanelLeft, PanelLeftClose } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import {
@@ -9,6 +9,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { OnboardingModal } from '@/components/onboarding-modal'
+import { fetchWithAuth } from '@/lib/fetch-with-auth'
+import { useSidebar } from '@/contexts/sidebar-context'
+import { Button } from '@/components/ui/button'
 
 interface UserResponse {
   id: string
@@ -29,8 +32,8 @@ export default function Topbar() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
-          credentials: 'include'
+        const response = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+          method: 'GET'
         })
         if (response.ok) {
           const userData = await response.json()
@@ -56,11 +59,10 @@ export default function Topbar() {
   const handleLogout = async () => {
     setLoggingOut(true)
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include'
+      const response = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
+        method: 'POST'
       })
-      
+
       if (response.ok) {
         // Redirect to login or home page after successful logout
         window.location.href = '/login'

@@ -61,6 +61,11 @@ export type MetadataEvent = {
     };
 }
 
+// Report output can be either:
+// 1. Direct HTML string (when streaming)
+// 2. Object with report_id (when loading from history)
+export type ReportOutput = string | { report_id: string };
+
 export type ReportEvent = {
     event: 'report';
     data: {
@@ -68,7 +73,7 @@ export type ReportEvent = {
         name?: string;
         state: 'input-streaming' | 'input-available' | 'output-available' | 'output-error';
         input?: any;
-        output?: string; // Complete HTML file as a string
+        output?: ReportOutput;
         errorText?: string;
     };
 }

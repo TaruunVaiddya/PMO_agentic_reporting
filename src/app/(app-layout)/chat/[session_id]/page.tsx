@@ -39,6 +39,13 @@ const ANIMATION_DURATION = 300;
 const extractHtmlContent = (output: any): string => {
   let htmlContent = '';
 
+  // Handle report_id reference - should not happen here as it's fetched in ReportBlock
+  // But adding safety check for edge cases
+  if (output && typeof output === 'object' && 'report_id' in output) {
+    console.warn('Received report_id reference in extractHtmlContent. This should be fetched in ReportBlock.');
+    return '';
+  }
+
   // Check if output has a result field
   if (output && typeof output === 'object' && output.result) {
     htmlContent = output.result;

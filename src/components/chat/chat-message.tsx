@@ -631,7 +631,24 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate }
   const hasAutoOpenedRef = React.useRef(false);
   const hasUpdatedOutputRef = React.useRef(false);
 
-  // Auto-open preview when report event first appears
+  // State for lazy loading report content
+  const [isLoadingReport, setIsLoadingReport] = React.useState(false);
+  const [fetchedHtmlContent, setFetchedHtmlContent] = React.useState<string | null>(null);
+  const [fetchError, setFetchError] = React.useState<string | null>(null);
+
+  // Import the type guards and fetch utility
+  const { isReportIdReference, fetchReportById } = React.useMemo(
+    () => require('@/lib/report-api'),
+    []
+  );
+
+  // Determine if this report has a report_id reference
+  const hasReportIdReference = React.useMemo(
+    () => isCompleted && report.output && isReportIdReference(report.output),
+    [isCompleted, report.output, isReportIdReference]
+  );
+
+  // Auto-open preview when report event first appears (streaming only)
   React.useEffect(() => {
     const shouldAutoOpen = (report.state === 'input-streaming' || report.state === 'input-available')
                           && onPreviewClick
@@ -643,40 +660,112 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate }
     }
   }, [report.state, onPreviewClick]);
 
-  // Update preview when output becomes available
-  // Only depend on report.id and report.output to minimize re-renders
+  // Update preview when output becomes available (streaming with direct HTML)
   React.useEffect(() => {
     if (isCompleted && report.output && onReportOutputUpdate && !hasUpdatedOutputRef.current) {
-      hasUpdatedOutputRef.current = true;
-      onReportOutputUpdate(report);
+      // Only auto-update if it's direct HTML content (streaming), not report_id reference
+      if (!isReportIdReference(report.output)) {
+        hasUpdatedOutputRef.current = true;
+        onReportOutputUpdate(report);
+      }
     }
-  }, [isCompleted, report.output, onReportOutputUpdate, report.id, report]);
+  }, [isCompleted, report.output, onReportOutputUpdate, report.id, report, isReportIdReference]);
+
+  // Fetch report content when user clicks (lazy loading)
+  const handleFetchAndPreview = React.useCallback(async () => {
+    if (!isCompleted || !onPreviewClick) return;
+
+    // If it has fetched HTML, use that
+    if (fetchedHtmlContent) {
+      const reportWithFetchedContent = {
+        ...report,
+        output: fetchedHtmlContent
+      };
+      onPreviewClick(reportWithFetchedContent, false);
+      return;
+    }
+
+    // If it's a report_id reference, fetch the content first
+    if (hasReportIdReference && report.output && typeof report.output === 'object') {
+      const reportId = report.output.report_id;
+
+      try {
+        setIsLoadingReport(true);
+        setFetchError(null);
+
+        // Fetch the actual report HTML
+        const htmlContent = await fetchReportById(reportId);
+
+        // Cache the fetched content
+        setFetchedHtmlContent(htmlContent?.html);
+
+        // Create updated report object with the fetched HTML
+        const reportWithFetchedContent = {
+          ...report,
+          output: htmlContent
+        };
+
+        // Open preview with the fetched content
+        onPreviewClick(reportWithFetchedContent, false);
+      } catch (error) {
+        console.error('Failed to fetch report:', error);
+        setFetchError(error instanceof Error ? error.message : 'Failed to load report');
+      } finally {
+        setIsLoadingReport(false);
+      }
+      return;
+    }
+
+    // Direct HTML content (streaming) - just open it
+    onPreviewClick(report, false);
+  }, [
+    isCompleted,
+    onPreviewClick,
+    fetchedHtmlContent,
+    hasReportIdReference,
+    report,
+    fetchReportById
+  ]);
 
   const getStatusInfo = () => {
-    if (isError) {
-      return { icon: <XCircleIcon className="size-5 text-red-500" />, text: 'Error', color: 'text-red-400' };
+    if (isError || fetchError) {
+      return {
+        icon: <XCircleIcon className="size-5 text-red-500" />,
+        text: 'Error',
+        color: 'text-red-400'
+      };
+    }
+    if (isLoadingReport) {
+      return {
+        icon: <ClockIcon className="size-5 text-blue-500 animate-spin" />,
+        text: 'Loading...',
+        color: 'text-blue-400'
+      };
     }
     if (isCompleted) {
-      return { icon: <CheckCircleIcon className="size-5 text-green-500" />, text: 'Completed', color: 'text-green-400' };
+      return {
+        icon: <CheckCircleIcon className="size-5 text-green-500" />,
+        text: 'Completed',
+        color: 'text-green-400'
+      };
     }
-    return { icon: <ClockIcon className="size-5 text-blue-500 animate-pulse" />, text: 'Generating...', color: 'text-blue-400' };
+    return {
+      icon: <ClockIcon className="size-5 text-blue-500 animate-pulse" />,
+      text: 'Generating...',
+      color: 'text-blue-400'
+    };
   };
 
   const statusInfo = getStatusInfo();
-
-  const handleClick = () => {
-    if (isCompleted && onPreviewClick) {
-      onPreviewClick(report, false); // Manual click, not auto-open
-    }
-  };
 
   return (
     <div
       className={cn(
         "w-full rounded-lg border border-white/20 bg-muted/10 p-4 transition-all duration-200",
-        isCompleted && "cursor-pointer hover:border-primary/50 hover:bg-muted/30"
+        isCompleted && !isLoadingReport && "cursor-pointer hover:border-primary/50 hover:bg-muted/30",
+        isLoadingReport && "opacity-75"
       )}
-      onClick={handleClick}
+      onClick={handleFetchAndPreview}
     >
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 mt-1">
@@ -695,16 +784,18 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate }
             </div>
           )}
 
-          {isCompleted && (
+          {isCompleted && !isLoadingReport && !fetchError && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Monitor className="w-4 h-4" />
               <span>Click to view report</span>
             </div>
           )}
 
-          {isError && report.errorText && (
-            <p className="text-xs text-red-400 mt-1">{report.errorText}</p>
-          )}
+          {(isError && report.errorText) || fetchError ? (
+            <p className="text-xs text-red-400 mt-1">
+              {fetchError || report.errorText}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>
