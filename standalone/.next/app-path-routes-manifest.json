@@ -1,0 +1,16 @@
+{
+  "/(app-layout)/chat/[session_id]/page": "/chat/[session_id]",
+  "/(app-layout)/chat/page": "/chat",
+  "/(app-layout)/library/[excel_id]/page": "/library/[excel_id]",
+  "/(app-layout)/library/documents/page": "/library/documents",
+  "/(app-layout)/library/knowledge/page": "/library/knowledge",
+  "/(app-layout)/library/page": "/library",
+  "/(app-layout)/report-templates/page": "/report-templates",
+  "/(app-layout)/reports/page": "/reports",
+  "/(auth-ui)/login/page": "/login",
+  "/(auth-ui)/signup/page": "/signup",
+  "/_not-found/page": "/_not-found",
+  "/excel-parser/page": "/excel-parser",
+  "/page": "/",
+  "/verify-email/page": "/verify-email"
+}

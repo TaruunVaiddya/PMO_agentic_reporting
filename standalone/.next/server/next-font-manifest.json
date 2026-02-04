@@ -1,0 +1,49 @@
+{
+  "app": {
+    "[project]/src/app/(app-layout)/chat/[session_id]/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ],
+    "[project]/src/app/(app-layout)/chat/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ],
+    "[project]/src/app/(app-layout)/library/[excel_id]/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ],
+    "[project]/src/app/(app-layout)/library/documents/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ],
+    "[project]/src/app/(app-layout)/library/knowledge/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ],
+    "[project]/src/app/(app-layout)/library/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ],
+    "[project]/src/app/(app-layout)/report-templates/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ],
+    "[project]/src/app/(app-layout)/reports/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ],
+    "[project]/src/app/(auth-ui)/login/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ],
+    "[project]/src/app/(auth-ui)/signup/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ],
+    "[project]/src/app/_not-found/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ],
+    "[project]/src/app/excel-parser/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ],
+    "[project]/src/app/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ],
+    "[project]/src/app/verify-email/page": [
+      "static/media/f141b5b7abe57afc-s.p.0de3c900.woff2"
+    ]
+  },
+  "appUsingSizeAdjust": true,
+  "pages": {},
+  "pagesUsingSizeAdjust": false
+}

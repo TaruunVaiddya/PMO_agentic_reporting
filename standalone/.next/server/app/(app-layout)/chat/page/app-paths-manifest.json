@@ -1,0 +1,3 @@
+{
+  "/(app-layout)/chat/page": "app/(app-layout)/chat/page.js"
+}

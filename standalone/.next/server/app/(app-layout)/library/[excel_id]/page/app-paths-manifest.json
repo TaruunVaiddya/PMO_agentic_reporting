@@ -1,0 +1,3 @@
+{
+  "/(app-layout)/library/[excel_id]/page": "app/(app-layout)/library/[excel_id]/page.js"
+}
