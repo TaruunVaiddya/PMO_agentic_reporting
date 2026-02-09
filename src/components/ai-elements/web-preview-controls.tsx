@@ -132,7 +132,7 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
         <WebPreviewNavigationButton
           tooltip={isGeneratingPDF ? "Generating PDF..." : "Download as PDF"}
           onClick={handleDownloadPDF}
-          disabled={isGeneratingPDF}
+          disabled={true}
         >
           {isGeneratingPDF ? (
             <Loader2 className="size-4 animate-spin" />
