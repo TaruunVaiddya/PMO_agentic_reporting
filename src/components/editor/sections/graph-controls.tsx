@@ -32,7 +32,7 @@ export const GraphControls: React.FC<GraphControlsProps> = React.memo(({ element
   );
 
   const handleBorderWidthChange = React.useCallback(
-    (value: number) => onUpdate('borderWidth', `${value}px`),
+    (value: string) => onUpdate('borderWidth', value),
     [onUpdate]
   );
 
@@ -42,12 +42,16 @@ export const GraphControls: React.FC<GraphControlsProps> = React.memo(({ element
   );
 
   const handleOpacityChange = React.useCallback(
-    (value: number) => onUpdate('opacity', value.toString()),
+    (value: string) => {
+      // Strip any unit suffix and pass just the number
+      const numValue = parseFloat(value);
+      onUpdate('opacity', isNaN(numValue) ? '1' : numValue.toString());
+    },
     [onUpdate]
   );
 
   const handleBorderRadiusChange = React.useCallback(
-    (value: number) => onUpdate('borderRadius', `${value}px`),
+    (value: string) => onUpdate('borderRadius', value),
     [onUpdate]
   );
 
@@ -71,6 +75,7 @@ export const GraphControls: React.FC<GraphControlsProps> = React.memo(({ element
         min={0}
         max={1}
         step={0.1}
+        unit=""
       />
 
       <div className="space-y-2 pt-2 border-t border-border/50">

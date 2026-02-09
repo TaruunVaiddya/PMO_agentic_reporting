@@ -10,9 +10,10 @@ import {
   PromptInputToolbar,
   PromptInputTools,
   PromptInputSubmit,
-  PromptInputMessage
+  PromptInputMessage,
+  usePromptInputAttachments
 } from '@/components/ai-elements/prompt-input';
-import { Globe, FileText, MessageCircleQuestion, FolderOpen, Binoculars } from 'lucide-react';
+import { Globe, FileText, MessageCircleQuestion, FolderOpen, Binoculars, ImagePlus } from 'lucide-react';
 import { MetallicButton } from '@/components/ui/metallic-button';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/get-fetcher';
@@ -38,6 +39,45 @@ interface ChatInputProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+}
+
+// Inner component to access attachments context
+function ImageUploadButton({ disabled }: { disabled?: boolean }) {
+  const attachments = usePromptInputAttachments();
+
+  return (
+    <button
+      type="button"
+      onClick={() => attachments.openFileDialog()}
+      disabled={disabled}
+      className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      title="Add images (max 4)"
+    >
+      <ImagePlus className="h-4 w-4 text-white/60" />
+    </button>
+  );
+}
+
+// Custom submit button that enables when there are attachments
+function ChatSubmitButton({
+  inputValue,
+  isSubmitting,
+  disabled
+}: {
+  inputValue: string;
+  isSubmitting: boolean;
+  disabled?: boolean;
+}) {
+  const attachments = usePromptInputAttachments();
+  const hasContent = inputValue.trim() || attachments.files.length > 0;
+
+  return (
+    <PromptInputSubmit
+      disabled={(!hasContent && !isSubmitting) || disabled}
+      status={isSubmitting ? 'submitted' : 'ready'}
+      className="bg-white hover:bg-white/90 text-black rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+    />
+  );
 }
 
 export function ChatInput({
@@ -246,9 +286,9 @@ export function ChatInput({
       <PromptInput
         onSubmit={handleSubmit}
         className={`border border-white/15 bg-black/40 backdrop-blur-sm rounded-2xl overflow-hidden shadow-2xl divide-white/15 ${className}`}
-        accept="image/*"
+        accept="image/png,image/jpeg,image/webp,image/gif"
         multiple
-        maxFiles={10}
+        maxFiles={4}
         maxFileSize={10 * 1024 * 1024}
       >
         <PromptInputBody className="bg-transparent custom-scrollbar">
@@ -273,6 +313,8 @@ export function ChatInput({
         <PromptInputToolbar className="bg-black/10">
           <PromptInputTools>
             <div className="flex items-center gap-1.5">
+              <ImageUploadButton disabled={disabled} />
+              <div className="w-px h-5 bg-white/10 mx-1" />
               <MetallicButton
                 type="button"
                 onClick={() => handleModeToggle('web-search')}
@@ -318,10 +360,10 @@ export function ChatInput({
               </MetallicButton>
             </div>
           </PromptInputTools>
-          <PromptInputSubmit
-            disabled={(!inputValue.trim() && !isSubmitting) || disabled}
-            status={isSubmitting ? 'submitted' : 'ready'}
-            className="bg-white hover:bg-white/90 text-black rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          <ChatSubmitButton
+            inputValue={inputValue}
+            isSubmitting={isSubmitting}
+            disabled={disabled}
           />
         </PromptInputToolbar>
       </PromptInput>

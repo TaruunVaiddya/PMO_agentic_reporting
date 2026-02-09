@@ -1,6 +1,6 @@
 import generateUniqueId from '@/lib/get_unique_id';
 import type { ContentEvent } from '@/types/chat';
-import { fetchWithAuth } from '@/lib/fetch-with-auth';
+import type { ChatImage } from '@/lib/image-utils';
 
 export interface ChatServiceConfig {
   chatStore: any;
@@ -8,7 +8,8 @@ export interface ChatServiceConfig {
   sessionId?: string | null;
   selected_agent?: string | null;
   is_new_chat?: boolean | false;
-  collection_id?:string | null;
+  collection_id?: string | null;
+  images?: ChatImage[];
 }
 
 export default class SSEChatHandler {
@@ -27,6 +28,7 @@ export default class SSEChatHandler {
     private selected_agent: string | null;
     private is_new_chat: boolean | false;
     private collection_id: string | null;
+    private images: ChatImage[];
 
     constructor(config: ChatServiceConfig) {
       this.chatStore = config.chatStore;
@@ -34,7 +36,8 @@ export default class SSEChatHandler {
       this.sessionId = config.sessionId || null;
       this.selected_agent = config.selected_agent || null;
       this.is_new_chat = config.is_new_chat || false;
-      this.collection_id = config.collection_id || null
+      this.collection_id = config.collection_id || null;
+      this.images = config.images || [];
     }
    
     private getId(): string {
@@ -50,20 +53,28 @@ export default class SSEChatHandler {
       }, this.chatId, 'user');
 
       try {
-        const response = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
+        const requestBody: Record<string, any> = {
+          query: this.input,
+          chat_id: this.chatId,
+          session_id: this.sessionId,
+          selected_agent: this.selected_agent,
+          is_new_session: this.is_new_chat,
+          collection_id: this.collection_id,
+        };
+
+        // Include images if present
+        if (this.images.length > 0) {
+          requestBody.images = this.images;
+        }
+
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'text/event-stream',
           },
-          body: JSON.stringify({
-            query: this.input,
-            chat_id: this.chatId,
-            session_id: this.sessionId,
-            selected_agent: this.selected_agent,
-            is_new_session: this.is_new_chat,
-            collection_id:this.collection_id
-          }),
+          body: JSON.stringify(requestBody),
+          credentials: 'include',
           signal: this.abortController.signal
         });
 

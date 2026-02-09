@@ -5,7 +5,7 @@ import React from 'react';
 interface NumberControlProps {
   label: string;
   value: string | number;
-  onChange: (value: any) => void;
+  onChange: (value: string) => void;
   min?: number;
   max?: number;
   step?: number;
@@ -21,17 +21,7 @@ export const NumberControl = React.memo(function NumberControl({
   step = 1,
   unit = 'px'
 }: NumberControlProps) {
-  const numericValue = typeof value === 'string' ? parseFloat(value) || 0 : value;
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVal = parseFloat(e.target.value);
-    // If unit is provided and NOT empty, append it. Otherwise just pass the number.
-    if (unit && unit !== '') {
-      onChange(`${newVal}${unit}`);
-    } else {
-      onChange(newVal);
-    }
-  };
+  const numericValue = typeof value === 'number' ? value : parseFloat(value) || 0;
 
   return (
     <div className="space-y-1.5">
@@ -45,7 +35,7 @@ export const NumberControl = React.memo(function NumberControl({
         max={max}
         step={step}
         value={numericValue}
-        onChange={handleChange}
+        onChange={(e) => onChange(`${e.target.value}${unit}`)}
         className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
       />
     </div>

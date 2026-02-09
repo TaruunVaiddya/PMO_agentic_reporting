@@ -25,6 +25,7 @@ import { ChatListType, ChatStoreType } from '@/types/chat';
 import { fetcher } from '@/lib/get-fetcher';
 import { useEditMode } from '@/hooks/use-edit-mode';
 import { EditPanel } from '@/components/editor/edit-panel';
+import { convertFilesToChatImages } from '@/lib/image-utils';
 
 interface ChatSessionPageProps {
   params: Promise<{
@@ -72,12 +73,40 @@ export default function Page({ params }: ChatSessionPageProps) {
   const chatStore = useContext(ChatProviderContext);
 
   useEffect(() => {
-    if(resolvedParams.session_id) {
+    if (resolvedParams.session_id) {
       (async () => {
         try {
           const response = await fetcher(`/conversations/${resolvedParams.session_id}`);
-          let chatList:ChatListType ={}
+          let chatList: ChatListType = {}
           response?.forEach((chat: any) => {
+            // Try to parse response as events array if it's a JSON string
+            let assistantContent: any = chat.response;
+
+            // Check if response is a JSON string containing events
+            if (typeof chat.response === 'string') {
+              try {
+                const parsed = JSON.parse(chat.response);
+                if (Array.isArray(parsed)) {
+                  assistantContent = parsed;
+                }
+              } catch {
+                // Not JSON, check if it's HTML content (report)
+                // If it contains HTML, create a synthetic report event
+                const htmlContent = extractHtmlContent(chat.response);
+                if (htmlContent && htmlContent.includes('<!DOCTYPE html>')) {
+                  assistantContent = [{
+                    event: 'report',
+                    data: {
+                      id: `report-${chat.id}`,
+                      name: 'Report',
+                      state: 'output-available',
+                      output: chat.response,
+                    }
+                  }];
+                }
+              }
+            }
+
             chatList[chat.id] = {
               userMessage: {
                 id: chat.id,
@@ -86,7 +115,7 @@ export default function Page({ params }: ChatSessionPageProps) {
               },
               assistantMessage: {
                 id: chat.id,
-                content: chat.response,
+                content: assistantContent,
                 role: "assistant",
               },
               status: "Completed",
@@ -103,7 +132,7 @@ export default function Page({ params }: ChatSessionPageProps) {
         }
       })();
     }
-    
+
   }, [resolvedParams.session_id]);
 
   return (
@@ -111,7 +140,7 @@ export default function Page({ params }: ChatSessionPageProps) {
   )
 }
 
-const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatStore }: { session_id: string, chatStore: ChatStoreType | null}) {
+const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatStore }: { session_id: string, chatStore: ChatStoreType | null }) {
   const { collapse } = useSidebar();
   // Get all chat IDs for this session using the hook
   const allChatIds = useChatIds();
@@ -134,13 +163,22 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
   // Track which report IDs have been auto-opened to prevent reopening
   const autoOpenedReportsRef = React.useRef<Set<string>>(new Set());
 
-  // Store iframe ref for applying edits
+  // Store iframe ref for applying edits and PDF export
   const iframeRef = React.useRef<HTMLIFrameElement | null>(null);
+  const previewIframeRef = React.useRef<HTMLIFrameElement | null>(null);
+
+  // Callback to get preview iframe for PDF export
+  const getPreviewIframe = React.useCallback(() => previewIframeRef.current, []);
+
+  // Callback when preview iframe is ready
+  const handlePreviewIframeRef = React.useCallback((iframe: HTMLIFrameElement | null) => {
+    previewIframeRef.current = iframe;
+  }, []);
 
   // Edit mode functionality - uses default config from library
   const { enableEditMode, disableEditMode, selectedElement, clearSelection } = useEditMode({
     onElementSelected: (element) => {
-      console.log('Selected element:', element);
+      // console.log('Selected element:', element);
     },
   });
 
@@ -211,7 +249,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
           type: 'RESET_ELEMENT'
         }, '*');
       } catch (error) {
-        console.error('Failed to reset element:', error);
+        // console.error('Failed to reset element:', error);
       }
     },
     []
@@ -339,12 +377,18 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
     }
 
     try {
+      // Convert files to base64 images for API (if present)
+      const images = message.files && message.files.length > 0
+        ? await convertFilesToChatImages(message.files)
+        : [];
+
       // Create SSE handler with the config object
       const sseHandler = new SSEChatHandler({
         chatStore,
         input: message.text || '',
         sessionId: session_id,
         selected_agent: message.mode,
+        images,
       });
 
       // Start the chat (SSE handler will update the store)
@@ -419,11 +463,13 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
         mode={previewMode}
         onModeChange={handleModeChange}
         onClose={handleClosePreview}
+        getPreviewIframe={getPreviewIframe}
       />
       <WebPreviewBody
         htmlContent={previewData.htmlContent}
         editMode={previewMode === 'edit'}
         onEditModeReady={handleEditModeReady}
+        onIframeRef={handlePreviewIframeRef}
       />
     </WebPreview>
   );

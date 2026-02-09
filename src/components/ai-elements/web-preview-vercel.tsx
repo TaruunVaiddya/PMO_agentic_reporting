@@ -9,6 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { usePaginatedReport } from '@/hooks/use-paginated-report';
 
 interface WebPreviewContextType {
   url: string;
@@ -199,6 +200,12 @@ export interface WebPreviewBodyProps {
   className?: string;
   editMode?: boolean; // Enable edit mode
   onEditModeReady?: (iframe: HTMLIFrameElement) => void; // Callback when iframe is ready for editing
+  /** Enable automatic pagination for A4 pages */
+  enablePagination?: boolean;
+  /** Callback when pagination completes */
+  onPaginationComplete?: (pageCount: number) => void;
+  /** Callback to expose iframe ref for PDF export */
+  onIframeRef?: (iframe: HTMLIFrameElement | null) => void;
 }
 
 export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
@@ -207,6 +214,9 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
   className,
   editMode = false,
   onEditModeReady,
+  enablePagination = true,
+  onPaginationComplete,
+  onIframeRef,
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { setIsLoading } = useWebPreview();
@@ -214,10 +224,40 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
   const [iframeSrcDoc, setIframeSrcDoc] = React.useState<string>('');
   const editModeAppliedRef = useRef(false);
 
+  // Use pagination hook for HTML content
+  const {
+    paginatedHtml,
+    isPaginating,
+    pageCount,
+    wasPaginated,
+  } = usePaginatedReport(htmlContent, {
+    enabled: enablePagination && !src,
+    debounceMs: 150,
+  });
+
+  // Notify parent about pagination completion
   useEffect(() => {
+    if (!isPaginating && pageCount > 0) {
+      onPaginationComplete?.(pageCount);
+    }
+  }, [isPaginating, pageCount, onPaginationComplete]);
+
+  useEffect(() => {
+    // Debug logging
+    // console.log('[WebPreviewBody] Content update:', {
+    //   hasSrc: !!src,
+    //   htmlContentLength: htmlContent?.length || 0,
+    //   paginatedHtmlLength: paginatedHtml?.length || 0,
+    //   htmlContentPreview: htmlContent?.substring(0, 100),
+    // });
+
     if (src) {
       // If src is provided, clear srcDoc to use src instead
       setIframeSrcDoc('');
+    } else if (paginatedHtml) {
+      // Use the paginated HTML
+      // console.log('[WebPreviewBody] Using paginatedHtml');
+      setIframeSrcDoc(paginatedHtml);
     } else if (htmlContent) {
       // Inject custom scrollbar styles into the HTML content
       const customScrollbarStyles = `
@@ -259,7 +299,7 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
 
       setIframeSrcDoc(modifiedHtml);
     }
-  }, [htmlContent, src]);
+  }, [paginatedHtml, htmlContent, src]);
 
   // Handle edit mode changes
   useEffect(() => {
@@ -291,10 +331,17 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
     editModeAppliedRef.current = false;
   }, [htmlContent, src]);
 
+  // Expose iframe ref to parent
+  useEffect(() => {
+    onIframeRef?.(iframeRef.current);
+  }, [iframeSrcDoc, onIframeRef]);
+
   const hasContent = !!(htmlContent || src);
+  const showPaginationIndicator = isPaginating && hasContent;
 
   return (
     <div className={cn('flex-1 bg-muted/20 overflow-hidden relative', className)}>
+      {/* Loading state - no content yet */}
       {!hasContent && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-background to-muted/30 z-10">
           <div className="flex flex-col items-center gap-6 animate-in fade-in duration-500">
@@ -323,6 +370,24 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
               <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Pagination indicator overlay */}
+      {showPaginationIndicator && (
+        <div className="absolute top-2 right-2 z-20 flex items-center gap-2 px-3 py-1.5 bg-background/90 border border-border rounded-md shadow-sm">
+          <div className="w-3 h-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+          <span className="text-xs text-muted-foreground">Formatting pages...</span>
+        </div>
+      )}
+
+      {/* Page count badge (shown after pagination) */}
+      {wasPaginated && pageCount > 1 && !isPaginating && (
+        <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 px-2.5 py-1 bg-background/90 border border-border rounded-md shadow-sm">
+          <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <span className="text-xs font-medium text-muted-foreground">{pageCount} pages</span>
         </div>
       )}
 
