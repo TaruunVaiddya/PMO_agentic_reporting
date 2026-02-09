@@ -1,16 +1,14 @@
 "use client";
 
 import React, { useState } from 'react';
-import React, { useState } from 'react';
 import {
   WebPreviewNavigation,
   WebPreviewNavigationButton,
   WebPreviewUrl,
 } from './web-preview-vercel';
 import { RotateCcw, ExternalLink, X, Edit3, Eye, Download, Loader2 } from 'lucide-react';
-import { RotateCcw, ExternalLink, X, Edit3, Eye, Download, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import html2pdf from 'html2pdf.js';
+import { capturePdfFromIframe, printToPdf } from '@/lib/pdf-utils';
 
 export type PreviewMode = 'view' | 'edit';
 
@@ -34,7 +32,7 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
   onClose,
   getPreviewIframe,
 }) => {
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const handleOpenInNewTab = () => {
     // Use the complete HTML directly
@@ -44,49 +42,27 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
     setTimeout(() => URL.revokeObjectURL(url), 100);
   };
 
-  const handleDownloadPDF = async () => {
-    setIsGeneratingPDF(true);
+  const handleDownloadPdf = async () => {
+    if (!htmlContent || isDownloading) return;
+
+    setIsDownloading(true);
 
     try {
-      // Create a temporary container to render the HTML
-      const container = document.createElement('div');
-      container.innerHTML = htmlContent;
+      // Get the actual preview iframe if available
+      const previewIframe = getPreviewIframe?.();
 
-      // Extract just the body content for PDF generation
-      const bodyContent = container.querySelector('body')?.innerHTML || htmlContent;
-
-      // Create a wrapper div with the content
-      const wrapper = document.createElement('div');
-      wrapper.innerHTML = bodyContent;
-      wrapper.style.padding = '20px';
-      wrapper.style.backgroundColor = 'white';
-
-      // PDF generation options
-      const options = {
-        margin: [10, 10, 10, 10] as [number, number, number, number],
-        filename: `${title || 'report'}.pdf`,
-        image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff'
-        },
-        jsPDF: {
-          unit: 'mm' as const,
-          format: 'a4' as const,
-          orientation: 'portrait' as const
-        }
-      };
-
-      // Generate and download PDF
-      await html2pdf().set(options).from(wrapper).save();
-
+      if (previewIframe && previewIframe.contentDocument) {
+        // Use the already-rendered iframe
+        await capturePdfFromIframe(previewIframe, title);
+      } else {
+        // Fallback: use browser print
+        await printToPdf(htmlContent, title);
+      }
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
+      console.error('Failed to generate PDF:', error);
+      alert('Failed to generate PDF: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
-      setIsGeneratingPDF(false);
+      setIsDownloading(false);
     }
   };
 
@@ -135,11 +111,11 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
         </div>
 
         <WebPreviewNavigationButton
-          tooltip={isGeneratingPDF ? "Generating PDF..." : "Download as PDF"}
-          onClick={handleDownloadPDF}
-          disabled={true}
+          tooltip="Download PDF"
+          onClick={handleDownloadPdf}
+          disabled={isDownloading || !htmlContent}
         >
-          {isGeneratingPDF ? (
+          {isDownloading ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
             <Download className="size-4" />
