@@ -5,13 +5,18 @@
 
 import { SelectedElementData } from '@/types/editor';
 
-const TEXT_ELEMENTS = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'a', 'li', 'td', 'th', 'label', 'button'];
+const TEXT_ELEMENTS = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'a', 'li', 'td', 'th', 'label', 'button', 'strong', 'em', 'b', 'i', 'small', 'blockquote', 'caption', 'figcaption', 'dt', 'dd'];
 const IMAGE_ELEMENTS = ['img'];
 const GRAPH_ELEMENTS = ['svg', 'canvas'];
 const CONTAINER_ELEMENTS = ['div', 'section', 'article', 'aside', 'main', 'figure'];
 
 export function isTextElement(tagName: string): boolean {
-  return TEXT_ELEMENTS.includes(tagName.toLowerCase());
+  const tag = tagName.toLowerCase();
+  // Direct text elements
+  if (TEXT_ELEMENTS.includes(tag)) return true;
+  // Container elements with text content are also editable
+  if (CONTAINER_ELEMENTS.includes(tag)) return true;
+  return false;
 }
 
 export function isImageElement(tagName: string): boolean {

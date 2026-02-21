@@ -64,6 +64,7 @@ export function usePaginatedReport(
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const lastContentRef = useRef<string>('');
+  const lastConfigRef = useRef<PaginationConfig>(config);
 
   const doPagination = useCallback(async (content: string) => {
     if (!content) {
@@ -115,24 +116,29 @@ export function usePaginatedReport(
   }, [doPagination]);
 
   useEffect(() => {
+    const configChanged =
+      config.pageWidthMm !== lastConfigRef.current.pageWidthMm ||
+      config.pageHeightMm !== lastConfigRef.current.pageHeightMm;
+
     console.log('[usePaginatedReport] useEffect triggered:', {
       htmlContentLength: htmlContent?.length || 0,
       lastContentLength: lastContentRef.current?.length || 0,
       enabled,
+      configChanged,
     });
 
-    // Skip if content hasn't changed
-    if (htmlContent === lastContentRef.current) {
-      console.log('[usePaginatedReport] Content unchanged, skipping');
+    // Skip only if BOTH content and config are unchanged
+    if (htmlContent === lastContentRef.current && !configChanged) {
+      console.log('[usePaginatedReport] Content & config unchanged, skipping');
       return;
     }
 
     lastContentRef.current = htmlContent || '';
+    lastConfigRef.current = config;
 
-    // Call pagination immediately (no debounce for debugging)
     console.log('[usePaginatedReport] Calling doPagination immediately');
     doPagination(htmlContent || '');
-  }, [htmlContent, doPagination]);
+  }, [htmlContent, config, doPagination]);
 
   return {
     paginatedHtml,

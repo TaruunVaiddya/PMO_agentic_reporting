@@ -14,7 +14,7 @@ import { FilterButton } from '@/components/ui/filter-button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useSearchFilter } from '@/hooks/use-search-filter'
 import { fetchAllReports, Report } from '@/lib/report-api'
-import { formatDistanceToNow } from 'date-fns'
+import { formatRelativeTime } from '@/lib/date-utils'
 
 // Helper function to map API report to card data format
 function mapReportToCardData(report: Report): ReportCardData {
@@ -34,7 +34,7 @@ function mapReportToCardData(report: Report): ReportCardData {
   let createdAt = 'Recently'
   try {
     if (report.created_at) {
-      createdAt = formatDistanceToNow(new Date(report.created_at), { addSuffix: true })
+      createdAt = formatRelativeTime(report.created_at)
     }
   } catch (error) {
     console.warn('Failed to parse date:', report.created_at)

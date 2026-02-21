@@ -194,6 +194,7 @@ export type PromptInputMessage = {
   files?: FileUIPart[];
   collection_id?: string | null;
   mode?: string | null;
+  template_id?: string | null;
 };
 
 export type PromptInputProps = Omit<

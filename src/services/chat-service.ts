@@ -1,6 +1,5 @@
 import generateUniqueId from '@/lib/get_unique_id';
 import type { ContentEvent } from '@/types/chat';
-import type { ChatImage } from '@/lib/image-utils';
 
 export interface ChatServiceConfig {
   chatStore: any;
@@ -9,7 +8,8 @@ export interface ChatServiceConfig {
   selected_agent?: string | null;
   is_new_chat?: boolean | false;
   collection_id?: string | null;
-  images?: ChatImage[];
+  metadata?: Record<string, any> | null;
+  template_id?: string | null;
 }
 
 export default class SSEChatHandler {
@@ -28,7 +28,8 @@ export default class SSEChatHandler {
     private selected_agent: string | null;
     private is_new_chat: boolean | false;
     private collection_id: string | null;
-    private images: ChatImage[];
+    private metadata: Record<string, any> | null;
+    private template_id: string | null;
 
     constructor(config: ChatServiceConfig) {
       this.chatStore = config.chatStore;
@@ -37,7 +38,8 @@ export default class SSEChatHandler {
       this.selected_agent = config.selected_agent || null;
       this.is_new_chat = config.is_new_chat || false;
       this.collection_id = config.collection_id || null;
-      this.images = config.images || [];
+      this.metadata = config.metadata || null;
+      this.template_id = config.template_id || null;
     }
    
     private getId(): string {
@@ -57,15 +59,12 @@ export default class SSEChatHandler {
           query: this.input,
           chat_id: this.chatId,
           session_id: this.sessionId,
+          metadata: this.metadata,
           selected_agent: this.selected_agent,
           is_new_session: this.is_new_chat,
           collection_id: this.collection_id,
+          template_id: this.template_id,
         };
-
-        // Include images if present
-        if (this.images.length > 0) {
-          requestBody.images = this.images;
-        }
 
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
           method: 'POST',

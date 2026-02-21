@@ -1,4 +1,4 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Trash2 } from 'lucide-react';
 
 export interface ReportCardData {
   id?: string;
@@ -13,9 +13,10 @@ export interface ReportCardData {
 interface ReportCardProps {
   report: ReportCardData;
   onClick?: (report: ReportCardData) => void;
+  onDelete?: (report: ReportCardData) => void;
 }
 
-export function ReportCard({ report, onClick }: ReportCardProps) {
+export function ReportCard({ report, onClick, onDelete }: ReportCardProps) {
   return (
     <button
       onClick={() => onClick?.(report)}
@@ -73,8 +74,32 @@ export function ReportCard({ report, onClick }: ReportCardProps) {
         </div>
       </div>
 
-      {/* Hover arrow */}
-      <ArrowRight className="absolute top-3 right-3 w-4 h-4 text-white/40 opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-x-0 group-hover:translate-x-0.5 z-20" />
+      {/* Delete button — only shown when onDelete is provided */}
+      {onDelete && (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(report);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.stopPropagation();
+              onDelete(report);
+            }
+          }}
+          className="absolute top-2 right-2 z-20 p-1.5 rounded-md bg-black/60 backdrop-blur-sm border border-white/10 text-white/50 opacity-0 group-hover:opacity-100 hover:bg-red-500/80 hover:text-white hover:border-red-500/50 transition-all duration-200 cursor-pointer"
+          title="Delete template"
+        >
+          <Trash2 className="w-3 h-3" />
+        </div>
+      )}
+
+      {/* Hover arrow — hide when delete button is present */}
+      {!onDelete && (
+        <ArrowRight className="absolute top-3 right-3 w-4 h-4 text-white/40 opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-x-0 group-hover:translate-x-0.5 z-20" />
+      )}
     </button>
   );
 }

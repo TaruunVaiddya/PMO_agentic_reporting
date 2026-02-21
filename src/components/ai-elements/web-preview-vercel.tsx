@@ -194,6 +194,8 @@ export const WebPreviewUrl: React.FC<WebPreviewUrlProps> = ({
 };
 
 // WebPreviewBody Component
+export type PageOrientation = 'portrait' | 'landscape';
+
 export interface WebPreviewBodyProps {
   src?: string;
   htmlContent?: string; // Complete HTML document string
@@ -202,6 +204,8 @@ export interface WebPreviewBodyProps {
   onEditModeReady?: (iframe: HTMLIFrameElement) => void; // Callback when iframe is ready for editing
   /** Enable automatic pagination for A4 pages */
   enablePagination?: boolean;
+  /** Page orientation — portrait (210x297mm) or landscape (297x210mm) */
+  orientation?: PageOrientation;
   /** Callback when pagination completes */
   onPaginationComplete?: (pageCount: number) => void;
   /** Callback to expose iframe ref for PDF export */
@@ -215,6 +219,7 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
   editMode = false,
   onEditModeReady,
   enablePagination = true,
+  orientation = 'portrait',
   onPaginationComplete,
   onIframeRef,
 }) => {
@@ -224,6 +229,14 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
   const [iframeSrcDoc, setIframeSrcDoc] = React.useState<string>('');
   const editModeAppliedRef = useRef(false);
 
+  // Build pagination config based on orientation
+  const paginationConfig = React.useMemo(() => {
+    if (orientation === 'landscape') {
+      return { pageWidthMm: 297, pageHeightMm: 210, contentScale: 0.75 };
+    }
+    return {}; // defaults to portrait (210x297)
+  }, [orientation]);
+
   // Use pagination hook for HTML content
   const {
     paginatedHtml,
@@ -232,6 +245,7 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
     wasPaginated,
   } = usePaginatedReport(htmlContent, {
     enabled: enablePagination && !src,
+    config: paginationConfig,
     debounceMs: 150,
   });
 
@@ -308,18 +322,34 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
     const iframe = iframeRef.current;
 
     if (editMode && !editModeAppliedRef.current) {
-      // Wait for iframe content to be ready
-      const enableEditMode = async () => {
-        // Add a small delay to ensure iframe content is fully loaded
-        await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for iframe to be fully loaded AND pagination to complete
+      let attempts = 0;
+      const maxAttempts = 50; // 50 * 100ms = 5 seconds max
 
-        if (iframe.contentDocument?.readyState === 'complete') {
-          onEditModeReady?.(iframe);
-          editModeAppliedRef.current = true;
+      const tryEnableEditMode = () => {
+        attempts++;
+        const iframeDoc = iframe.contentDocument;
+        const iframeWin = iframe.contentWindow as any;
+
+        if (!iframeDoc || iframeDoc.readyState !== 'complete') {
+          // Iframe not loaded yet — retry
+          if (attempts < maxAttempts) setTimeout(tryEnableEditMode, 100);
+          return;
         }
+
+        // Check if pagination is in progress (has container but not yet complete)
+        const hasPagination = !!iframeDoc.querySelector('.a4-page-container');
+        if (hasPagination && !iframeWin?.__paginationComplete) {
+          // Pagination still running — retry
+          if (attempts < maxAttempts) setTimeout(tryEnableEditMode, 100);
+          return;
+        }
+
+        onEditModeReady?.(iframe);
+        editModeAppliedRef.current = true;
       };
 
-      enableEditMode();
+      tryEnableEditMode();
     } else if (!editMode && editModeAppliedRef.current) {
       // Reset flag when edit mode is disabled
       editModeAppliedRef.current = false;

@@ -13,7 +13,7 @@ import {
   PromptInputMessage,
   usePromptInputAttachments
 } from '@/components/ai-elements/prompt-input';
-import { Globe, FileText, MessageCircleQuestion, FolderOpen, Binoculars, ImagePlus } from 'lucide-react';
+import { Globe, FileText, MessageCircleQuestion, FolderOpen, Binoculars, ImagePlus, LayoutTemplate } from 'lucide-react';
 import { MetallicButton } from '@/components/ui/metallic-button';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/get-fetcher';
@@ -34,11 +34,17 @@ interface CollectionPosition {
   end: number;
 }
 
+export interface SelectedTemplate {
+  id: string;
+  name: string;
+}
+
 interface ChatInputProps {
   onSubmit: (message: PromptInputMessage) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  initialTemplate?: SelectedTemplate | null;
 }
 
 // Inner component to access attachments context
@@ -68,8 +74,7 @@ function ChatSubmitButton({
   isSubmitting: boolean;
   disabled?: boolean;
 }) {
-  const attachments = usePromptInputAttachments();
-  const hasContent = inputValue.trim() || attachments.files.length > 0;
+  const hasContent = inputValue.trim().length > 0;
 
   return (
     <PromptInputSubmit
@@ -84,13 +89,15 @@ export function ChatInput({
   onSubmit,
   placeholder = "What would you like to know?",
   className = "",
-  disabled = false
+  disabled = false,
+  initialTemplate = null,
 }: ChatInputProps) {
   const [inputValue, setInputValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMode, setSelectedMode] = useState<ChatMode>(null);
   const [showCollectionMenu, setShowCollectionMenu] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<SelectedTemplate | null>(initialTemplate);
   // NEW STATE to track position
   const [collectionTagPosition, setCollectionTagPosition] = useState<CollectionPosition | null>(null); 
   const [collectionMenuPosition, setCollectionMenuPosition] = useState(0);
@@ -232,13 +239,16 @@ export function ChatInput({
     try {
       const messageWithMode = {
         ...message,
+        files: [],  // Strip files — image upload is disabled
         mode: selectedMode,
-        collection_id: selectedCollection?.id ?? null
+        collection_id: selectedCollection?.id ?? null,
+        template_id: selectedTemplate?.id ?? null,
       };
       await onSubmit(messageWithMode);
       setInputValue('');
       setSelectedCollection(null);
-      setCollectionTagPosition(null); // Reset position on submit
+      setCollectionTagPosition(null);
+      setSelectedTemplate(null);
     } catch (error) {
       console.error('Error submitting message:', error);
     } finally {
@@ -264,22 +274,42 @@ export function ChatInput({
 
   return (
     <div className="relative" ref={containerRef}>
-      {/* Selected Collection Tag placed at Top Right (Absolute Positioning) */}
-      {selectedCollection && (
-        <div className="absolute -top-10 right-0 z-10 p-2"> 
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-xs text-white/70 shadow-lg">
-            <FolderOpen className="w-3 h-3" />
-            <span className="font-medium">Collection:</span>
-            <span>{selectedCollection.name}</span>
-            <button
-              onClick={() => handleRemoveCollection()}
-              className="ml-1 hover:text-white/90 transition-colors focus:outline-none"
-              type="button"
-              aria-label="Remove selected collection"
-            >
-              ×
-            </button>
-          </div>
+      {/* Tags above input */}
+      {(selectedCollection || selectedTemplate) && (
+        <div className="absolute -top-10 right-0 z-10 p-2 flex items-center gap-2">
+          {/* Selected Template Tag */}
+          {selectedTemplate && (
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-purple-500/15 border border-purple-400/25 rounded-md text-xs text-purple-300/90 shadow-lg">
+              <LayoutTemplate className="w-3 h-3" />
+              <span className="font-medium">Template:</span>
+              <span>{selectedTemplate.name}</span>
+              <button
+                onClick={() => setSelectedTemplate(null)}
+                className="ml-1 hover:text-white/90 transition-colors focus:outline-none"
+                type="button"
+                aria-label="Remove selected template"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* Selected Collection Tag */}
+          {selectedCollection && (
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-xs text-white/70 shadow-lg">
+              <FolderOpen className="w-3 h-3" />
+              <span className="font-medium">Collection:</span>
+              <span>{selectedCollection.name}</span>
+              <button
+                onClick={() => handleRemoveCollection()}
+                className="ml-1 hover:text-white/90 transition-colors focus:outline-none"
+                type="button"
+                aria-label="Remove selected collection"
+              >
+                ×
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -313,7 +343,7 @@ export function ChatInput({
         <PromptInputToolbar className="bg-black/10">
           <PromptInputTools>
             <div className="flex items-center gap-1.5">
-              <ImageUploadButton disabled={disabled} />
+              <ImageUploadButton disabled={true} />
               <div className="w-px h-5 bg-white/10 mx-1" />
               <MetallicButton
                 type="button"

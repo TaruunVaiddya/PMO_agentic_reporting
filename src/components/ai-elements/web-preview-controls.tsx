@@ -6,17 +6,20 @@ import {
   WebPreviewNavigationButton,
   WebPreviewUrl,
 } from './web-preview-vercel';
-import { RotateCcw, ExternalLink, X, Edit3, Eye, Download, Loader2 } from 'lucide-react';
+import { RotateCcw, ExternalLink, X, Edit3, Eye, Download, Loader2, RectangleVertical, RectangleHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { capturePdfFromIframe, printToPdf } from '@/lib/pdf-utils';
 
 export type PreviewMode = 'view' | 'edit';
+export type PageOrientation = 'portrait' | 'landscape';
 
 interface WebPreviewControlsProps {
   title: string;
   htmlContent: string; // Complete HTML document
   mode?: PreviewMode;
   onModeChange?: (mode: PreviewMode) => void;
+  orientation?: PageOrientation;
+  onOrientationChange?: (orientation: PageOrientation) => void;
   onReload?: () => void;
   onClose?: () => void;
   /** Reference to get the current preview iframe */
@@ -28,6 +31,8 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
   htmlContent,
   mode = 'view',
   onModeChange,
+  orientation = 'portrait',
+  onOrientationChange,
   onReload,
   onClose,
   getPreviewIframe,
@@ -53,10 +58,10 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
 
       if (previewIframe && previewIframe.contentDocument) {
         // Use the already-rendered iframe
-        await capturePdfFromIframe(previewIframe, title);
+        await capturePdfFromIframe(previewIframe, title, orientation);
       } else {
         // Fallback: use browser print
-        await printToPdf(htmlContent, title);
+        await printToPdf(htmlContent, title, orientation);
       }
     } catch (error) {
       console.error('Failed to generate PDF:', error);
@@ -107,6 +112,34 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
           >
             <Edit3 className="size-3.5" />
             <span>Edit</span>
+          </button>
+        </div>
+
+        {/* Orientation Toggle */}
+        <div className="flex items-center bg-muted/50 rounded-md p-0.5">
+          <button
+            onClick={() => onOrientationChange?.('portrait')}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-all",
+              orientation === 'portrait'
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            title="Portrait"
+          >
+            <RectangleVertical className="size-3.5" />
+          </button>
+          <button
+            onClick={() => onOrientationChange?.('landscape')}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-all",
+              orientation === 'landscape'
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            title="Landscape"
+          >
+            <RectangleHorizontal className="size-3.5" />
           </button>
         </div>
 

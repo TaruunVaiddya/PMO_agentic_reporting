@@ -5,7 +5,6 @@ import { ChatProviderContext } from '@/contexts/chat-provider';
 import { useSession } from '@/contexts/session-context';
 import SSEChatHandler from '@/services/chat-service';
 import generateUniqueId from '@/lib/get_unique_id';
-import { convertFilesToChatImages } from '@/lib/image-utils';
 import { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 
 export const useChatHandler = () => {
@@ -31,13 +30,9 @@ export const useChatHandler = () => {
             // Store session details in session storage
             sessionStorage.setItem('session-details-' + sessionId, JSON.stringify({
                 selected_mode: message.mode || null,
-                collection_id: message.collection_id || null
+                collection_id: message.collection_id || null,
+                template_id: message.template_id || null,
             }));
-
-            // Convert files to base64 images for API
-            const images = message.files && message.files.length > 0
-                ? await convertFilesToChatImages(message.files)
-                : [];
 
             // Create SSE handler with the new config object
             const sseHandler = new SSEChatHandler({
@@ -47,7 +42,7 @@ export const useChatHandler = () => {
                 selected_agent: message.mode,
                 is_new_chat: true,
                 collection_id: message.collection_id,
-                images,
+                template_id: message.template_id,
             });
 
             // Start the chat

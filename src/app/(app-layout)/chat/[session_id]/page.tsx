@@ -13,7 +13,7 @@ import {
   WebPreview,
   WebPreviewBody
 } from '@/components/ai-elements/web-preview-vercel';
-import { WebPreviewControls, PreviewMode } from '@/components/ai-elements/web-preview-controls';
+import { WebPreviewControls, PreviewMode, PageOrientation } from '@/components/ai-elements/web-preview-controls';
 import { useSidebar } from '@/contexts/sidebar-context';
 import { cn } from '@/lib/utils';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
@@ -25,7 +25,6 @@ import { ChatListType, ChatStoreType } from '@/types/chat';
 import { fetcher } from '@/lib/get-fetcher';
 import { useEditMode } from '@/hooks/use-edit-mode';
 import { EditPanel } from '@/components/editor/edit-panel';
-import { convertFilesToChatImages } from '@/lib/image-utils';
 
 interface ChatSessionPageProps {
   params: Promise<{
@@ -183,6 +182,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
   });
 
   const [previewMode, setPreviewMode] = useState<PreviewMode>('view');
+  const [pageOrientation, setPageOrientation] = useState<PageOrientation>('portrait');
 
   // Handle mode change
   const handleModeChange = React.useCallback(
@@ -377,18 +377,12 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
     }
 
     try {
-      // Convert files to base64 images for API (if present)
-      const images = message.files && message.files.length > 0
-        ? await convertFilesToChatImages(message.files)
-        : [];
-
       // Create SSE handler with the config object
       const sseHandler = new SSEChatHandler({
         chatStore,
         input: message.text || '',
         sessionId: session_id,
         selected_agent: message.mode,
-        images,
       });
 
       // Start the chat (SSE handler will update the store)
@@ -462,12 +456,15 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
         htmlContent={previewData.htmlContent}
         mode={previewMode}
         onModeChange={handleModeChange}
+        orientation={pageOrientation}
+        onOrientationChange={setPageOrientation}
         onClose={handleClosePreview}
         getPreviewIframe={getPreviewIframe}
       />
       <WebPreviewBody
         htmlContent={previewData.htmlContent}
         editMode={previewMode === 'edit'}
+        orientation={pageOrientation}
         onEditModeReady={handleEditModeReady}
         onIframeRef={handlePreviewIframeRef}
       />

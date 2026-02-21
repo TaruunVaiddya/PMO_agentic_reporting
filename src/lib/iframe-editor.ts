@@ -112,6 +112,7 @@ function createEditorScript(config: EditorConfig): string {
       const originalOutlines = new WeakMap();
       const originalCursors = new WeakMap();
       const originalStyles = new WeakMap(); // Store original styles for reset
+      let selectStartHandler = null;
 
       // Elements to ignore
       const IGNORE_ELEMENTS = ['HTML', 'BODY', 'SCRIPT', 'STYLE', 'META', 'LINK', 'HEAD', 'TITLE'];
@@ -206,13 +207,12 @@ function createEditorScript(config: EditorConfig): string {
         if (!originalStyles.has(element)) {
           const computed = window.getComputedStyle(element);
           originalStyles.set(element, {
-            textContent: element.textContent,
+            innerHTML: element.innerHTML,
             fontSize: element.style.fontSize || computed.fontSize,
             fontWeight: element.style.fontWeight || computed.fontWeight,
             color: element.style.color || computed.color,
             backgroundColor: element.style.backgroundColor || computed.backgroundColor,
             textAlign: element.style.textAlign || computed.textAlign,
-            // Add more as needed
           });
         }
       }
@@ -397,11 +397,12 @@ function createEditorScript(config: EditorConfig): string {
         document.addEventListener('click', handleClick, true);
 
         // Prevent default text selection during editing
-        document.addEventListener('selectstart', (e) => {
+        selectStartHandler = function(e) {
           if (hoveredElement || selectedElement) {
             e.preventDefault();
           }
-        }, true);
+        };
+        document.addEventListener('selectstart', selectStartHandler, true);
       }
 
       /**
@@ -410,10 +411,15 @@ function createEditorScript(config: EditorConfig): string {
       function cleanupEditor() {
         console.log('Cleaning up iframe editor');
 
-        // Remove event listeners
+        // Remove ALL event listeners
         document.removeEventListener('mouseover', handleMouseOver, true);
         document.removeEventListener('mouseout', handleMouseOut, true);
         document.removeEventListener('click', handleClick, true);
+        if (selectStartHandler) {
+          document.removeEventListener('selectstart', selectStartHandler, true);
+          selectStartHandler = null;
+        }
+        window.removeEventListener('message', handleParentMessage);
 
         // Restore all modified elements
         if (hoveredElement) {
@@ -438,7 +444,8 @@ function createEditorScript(config: EditorConfig): string {
 
           // Apply style to selected element
           if (property === 'textContent') {
-            selectedElement.textContent = value;
+            // Use innerText to preserve line breaks without destroying child structure
+            selectedElement.innerText = value;
           } else if (property === 'chartData') {
             // Handle chart data updates
             try {
@@ -446,9 +453,14 @@ function createEditorScript(config: EditorConfig): string {
               if (selectedElement.dataset) {
                 selectedElement.dataset.chartData = JSON.stringify(parsedData);
               }
-              // Trigger re-render if chart library exposes update method
-              if (selectedElement.__chart && typeof selectedElement.__chart.update === 'function') {
-                selectedElement.__chart.update(parsedData);
+              // Try Chart.js getChart API (v3+/v4+)
+              if (typeof Chart !== 'undefined' && Chart.getChart) {
+                var chartInstance = Chart.getChart(selectedElement);
+                if (chartInstance && typeof chartInstance.update === 'function') {
+                  if (parsedData.data) chartInstance.data = parsedData.data;
+                  if (parsedData.options) chartInstance.options = parsedData.options;
+                  chartInstance.update();
+                }
               }
             } catch (error) {
               console.error('Failed to update chart data:', error);
@@ -457,10 +469,10 @@ function createEditorScript(config: EditorConfig): string {
             selectedElement.style[property] = value;
           }
         } else if (event.data.type === 'RESET_ELEMENT' && selectedElement) {
-          // Reset only the selected element to its original styles
+          // Reset only the selected element to its original state
           const original = originalStyles.get(selectedElement);
           if (original) {
-            selectedElement.textContent = original.textContent;
+            selectedElement.innerHTML = original.innerHTML;
             selectedElement.style.fontSize = original.fontSize;
             selectedElement.style.fontWeight = original.fontWeight;
             selectedElement.style.color = original.color;

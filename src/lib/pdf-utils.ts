@@ -3,11 +3,14 @@
  * Utility functions for PDF generation and printing
  */
 
-export const capturePdfFromIframe = async (iframe: HTMLIFrameElement, filename: string) => {
+export type PdfOrientation = 'portrait' | 'landscape';
+
+export const capturePdfFromIframe = async (
+    iframe: HTMLIFrameElement,
+    filename: string,
+    orientation: PdfOrientation = 'portrait'
+) => {
     const { default: jsPDF } = await import('jspdf');
-    // html2canvas is dynamically imported inside the iframe context usually, 
-    // but here we just need jsPDF to be imported dynamically to keep bundle size low if needed.
-    // The original implementation logic for capturing follows.
 
     const iframeDoc = iframe.contentDocument;
     if (!iframeDoc) {
@@ -22,13 +25,14 @@ export const capturePdfFromIframe = async (iframe: HTMLIFrameElement, filename: 
         throw new Error('No pages found to export');
     }
 
-    // A4 dimensions
-    const a4Width = 210;
-    const a4Height = 297;
+    // A4 dimensions based on orientation
+    const isLandscape = orientation === 'landscape';
+    const pdfWidth = isLandscape ? 297 : 210;
+    const pdfHeight = isLandscape ? 210 : 297;
 
     // Create PDF
     const pdf = new jsPDF({
-        orientation: 'portrait',
+        orientation: orientation,
         unit: 'mm',
         format: 'a4'
     });
@@ -54,15 +58,15 @@ export const capturePdfFromIframe = async (iframe: HTMLIFrameElement, filename: 
         await new Promise(resolve => setTimeout(resolve, 100));
     }
 
+    // Use html2canvas from iframe context
+    const iframeHtml2Canvas = (iframeWindow as any).html2canvas;
+    if (!iframeHtml2Canvas) {
+        throw new Error('html2canvas not available in iframe');
+    }
+
     // Capture each page
     for (let i = 0; i < pages.length; i++) {
         const page = pages[i] as HTMLElement;
-
-        // Use html2canvas from iframe context
-        const iframeHtml2Canvas = (iframeWindow as any).html2canvas;
-        if (!iframeHtml2Canvas) {
-            throw new Error('html2canvas not available in iframe');
-        }
 
         const canvas = await iframeHtml2Canvas(page, {
             scale: 2,
@@ -70,6 +74,20 @@ export const capturePdfFromIframe = async (iframe: HTMLIFrameElement, filename: 
             allowTaint: true,
             backgroundColor: '#ffffff',
             logging: false,
+            onclone: (_clonedDoc: Document, clonedElement: HTMLElement) => {
+                // html2canvas does NOT support CSS zoom (causes overlapping text).
+                // Swap zoom with transform:scale() on the cloned DOM — html2canvas
+                // fully supports CSS transforms, producing identical visual output.
+                const content = clonedElement.querySelector('.a4-page-content') as HTMLElement | null;
+                if (!content) return;
+                const zoomVal = parseFloat(content.style.zoom) || 1;
+                if (zoomVal === 1 || zoomVal <= 0) return;
+
+                content.style.zoom = '';
+                content.style.transform = `scale(${zoomVal})`;
+                content.style.transformOrigin = 'top left';
+                content.style.overflow = 'visible';
+            },
         });
 
         // Convert to image
@@ -80,7 +98,7 @@ export const capturePdfFromIframe = async (iframe: HTMLIFrameElement, filename: 
             pdf.addPage();
         }
 
-        pdf.addImage(imgData, 'JPEG', 0, 0, a4Width, a4Height);
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
         console.log(`[PDF] Captured page ${i + 1}/${pages.length}`);
     }
 
@@ -88,23 +106,31 @@ export const capturePdfFromIframe = async (iframe: HTMLIFrameElement, filename: 
     pdf.save(`${filename || 'report'}.pdf`);
 };
 
-export const printToPdf = async (html: string, filename: string) => {
+export const printToPdf = async (
+    html: string,
+    filename: string,
+    orientation: PdfOrientation = 'portrait'
+) => {
     // Open new window with print-optimized content
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
         throw new Error('Could not open print window. Please allow popups.');
     }
 
+    const isLandscape = orientation === 'landscape';
+    const pageWidth = isLandscape ? 297 : 210;
+    const pageHeight = isLandscape ? 210 : 297;
+
     // Add print styles
     const printHtml = html.replace(
         '</head>',
         `<style>
       @media print {
-        @page { size: A4 portrait; margin: 0; }
+        @page { size: A4 ${orientation}; margin: 0; }
         html, body { margin: 0 !important; padding: 0 !important; }
         .a4-page-container { background: white !important; padding: 0 !important; gap: 0 !important; }
         .a4-page {
-          width: 210mm !important; height: 297mm !important;
+          width: ${pageWidth}mm !important; height: ${pageHeight}mm !important;
           box-shadow: none !important; margin: 0 !important;
           page-break-after: always !important;
         }

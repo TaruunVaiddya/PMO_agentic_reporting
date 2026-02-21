@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useContext } from 'react';
-import { useRouter } from 'next/navigation';
-import { ChatInput } from '@/components/chat/chat-input';
+import React, { useEffect, useContext, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ChatInput, SelectedTemplate } from '@/components/chat/chat-input';
 import { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import { ArrowRight, TrendingUp, PieChart, BarChart3, Calendar } from 'lucide-react';
 import { ChatProviderContext } from '@/contexts/chat-provider';
@@ -11,10 +11,21 @@ import { useChatHandler } from '@/hooks/use-chat-handler';
 
 export default function Page() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const chatStore = useContext(ChatProviderContext);
   const { setPendingQuery, setNewSessionId } = useSession();
 
   const { handleStartChat, handleSuggestionClick } = useChatHandler();
+
+  // Read template info from query params (from report-templates page)
+  const initialTemplate: SelectedTemplate | null = useMemo(() => {
+    const templateId = searchParams.get('template_id');
+    const templateName = searchParams.get('template_name');
+    if (templateId && templateName) {
+      return { id: templateId, name: templateName };
+    }
+    return null;
+  }, [searchParams]);
 
   const handleSubmit = (message: PromptInputMessage) => {
     handleStartChat(message);
@@ -45,6 +56,7 @@ export default function Page() {
           <ChatInput
             onSubmit={handleSubmit}
             placeholder="What would you like to know?"
+            initialTemplate={initialTemplate}
           />
         </div>
 
