@@ -383,6 +383,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
         input: message.text || '',
         sessionId: session_id,
         selected_agent: message.mode,
+        template_id: message.template_id,
       });
 
       // Start the chat (SSE handler will update the store)
