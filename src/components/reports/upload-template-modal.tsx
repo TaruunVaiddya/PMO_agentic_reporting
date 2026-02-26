@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef } from 'react'
-import { Upload, Loader2, FileCode, X } from 'lucide-react'
+import { Upload, Loader2, ImageIcon, X, Clock } from 'lucide-react'
 import { fetchWithAuth } from '@/lib/fetch-with-auth'
 import { toast } from 'sonner'
 import {
@@ -12,48 +12,40 @@ import {
 } from "@/components/ui/dialog"
 import { motion, AnimatePresence } from 'motion/react'
 
-const CATEGORIES = [
-  { value: 'custom', label: 'Custom' },
-  { value: 'business', label: 'Business' },
-  { value: 'finance', label: 'Finance' },
-  { value: 'operations', label: 'Operations' },
-  { value: 'marketing', label: 'Marketing' },
-]
-
 interface UploadTemplateModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
 }
 
+const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif']
+
 export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTemplateModalProps) {
   const [name, setName] = useState('')
-  const [category, setCategory] = useState('custom')
   const [description, setDescription] = useState('')
-  const [thumbnailUrl, setThumbnailUrl] = useState('')
-  const [htmlFile, setHtmlFile] = useState<File | null>(null)
+  const [imageFile, setImageFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!file.name.endsWith('.html') && file.type !== 'text/html') {
-      toast.error('Please upload an HTML file')
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      toast.error('Please upload an image file (PNG, JPG, WebP, GIF)')
       return
     }
-    setHtmlFile(file)
+    setImageFile(file)
   }
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     const file = e.dataTransfer.files?.[0]
     if (!file) return
-    if (!file.name.endsWith('.html') && file.type !== 'text/html') {
-      toast.error('Please upload an HTML file')
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      toast.error('Please upload an image file (PNG, JPG, WebP, GIF)')
       return
     }
-    setHtmlFile(file)
+    setImageFile(file)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,27 +55,26 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
       toast.error('Template name is required')
       return
     }
-    if (!htmlFile) {
-      toast.error('Please upload an HTML file')
+    if (!imageFile) {
+      toast.error('Please upload an image')
       return
     }
 
     setIsSubmitting(true)
     try {
-      const htmlContent = await htmlFile.text()
+      const formData = new FormData()
+      formData.append('content', imageFile)
+      formData.append('mime_type', imageFile.type)
+      formData.append('filename', name.trim())
+      if (description.trim()) {
+        formData.append('description', description.trim())
+      }
 
       const response = await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL}/report-templates`,
+        `${process.env.NEXT_PUBLIC_API_URL}/upload-template`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: name.trim(),
-            code: { html: htmlContent },
-            category,
-            description: description.trim() || null,
-            thumbnail_url: thumbnailUrl.trim() || null,
-          }),
+          body: formData,
         }
       )
 
@@ -92,7 +83,7 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
         throw new Error(body?.detail?.error || body?.detail || 'Failed to upload template')
       }
 
-      toast.success('Template uploaded successfully')
+      toast.success('Template uploaded successfully! It will appear shortly.')
       handleClose()
       onSuccess()
     } catch (err) {
@@ -105,10 +96,8 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
   const handleClose = () => {
     if (isSubmitting) return
     setName('')
-    setCategory('custom')
     setDescription('')
-    setThumbnailUrl('')
-    setHtmlFile(null)
+    setImageFile(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
     onOpenChange(false)
   }
@@ -116,8 +105,8 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
   return (
     <AnimatePresence>
       {open && (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent className="sm:max-w-[540px] p-0 overflow-hidden border border-white/30 shadow-2xl bg-gradient-to-br from-black/95 to-neutral-950/95 backdrop-blur-xl">
+        <Dialog open={open} onOpenChange={(v) => { if (!isSubmitting) onOpenChange(v) }}>
+          <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border border-white/30 shadow-2xl bg-gradient-to-br from-black/95 to-neutral-950/95 backdrop-blur-xl">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -131,168 +120,165 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
                     Upload Template
                   </DialogTitle>
                   <p className="text-sm text-neutral-400 mt-1">
-                    Upload an HTML file to use as a report template
+                    Add a new report template from an image
                   </p>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Name */}
-                  <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">
-                      Template Name <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g., Q4 Financial Report"
-                      disabled={isSubmitting}
-                      autoFocus
-                      maxLength={100}
-                      className="w-full p-3 bg-black/20 border border-white/20 focus:border-white/40 rounded-lg text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                  </div>
-
-                  {/* Category */}
-                  <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">
-                      Category <span className="text-red-400">*</span>
-                    </label>
-                    <select
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      disabled={isSubmitting}
-                      className="w-full p-3 bg-black/20 border border-white/20 focus:border-white/40 rounded-lg text-sm text-white/90 focus:outline-none focus:ring-1 focus:ring-white/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                <AnimatePresence mode="wait">
+                  {isSubmitting ? (
+                    /* ── Processing State ─────────────────── */
+                    <motion.div
+                      key="loading"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      className="py-12 flex flex-col items-center gap-6 text-center"
                     >
-                      {CATEGORIES.map((c) => (
-                        <option key={c.value} value={c.value} className="bg-neutral-900 text-white">
-                          {c.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* HTML File Upload */}
-                  <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">
-                      HTML File <span className="text-red-400">*</span>
-                    </label>
-                    <div
-                      onDrop={handleDrop}
-                      onDragOver={(e) => e.preventDefault()}
-                      onClick={() => !isSubmitting && fileInputRef.current?.click()}
-                      className={`w-full border-2 border-dashed rounded-lg p-5 flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer
-                        ${htmlFile ? 'border-white/30 bg-white/5' : 'border-white/15 hover:border-white/30 hover:bg-white/5'}
-                        ${isSubmitting ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+                      <div className="relative">
+                        <div className="w-16 h-16 rounded-full border border-white/10 bg-white/5 flex items-center justify-center">
+                          <Loader2 className="w-7 h-7 text-white/60 animate-spin" />
+                        </div>
+                        <div className="absolute inset-0 rounded-full bg-white/5 animate-ping opacity-30" />
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-base font-medium text-white">Processing your template…</p>
+                        <p className="text-sm text-white/40 max-w-[280px]">
+                          We're analysing the image and setting up your template. This may take a moment.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10">
+                        <Clock className="w-3.5 h-3.5 text-white/30" />
+                        <span className="text-xs text-white/40">Please don't close this window</span>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    /* ── Upload Form ──────────────────────── */
+                    <motion.form
+                      key="form"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      onSubmit={handleSubmit}
+                      className="space-y-4"
                     >
-                      {htmlFile ? (
-                        <>
-                          <FileCode className="w-6 h-6 text-white/60" />
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-white/80 truncate max-w-[280px]">{htmlFile.name}</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setHtmlFile(null)
-                                if (fileInputRef.current) fileInputRef.current.value = ''
-                              }}
-                              className="text-white/40 hover:text-white/70 transition-colors"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <span className="text-xs text-white/40">
-                            {(htmlFile.size / 1024).toFixed(1)} KB
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-6 h-6 text-white/40" />
-                          <span className="text-sm text-white/60">Drop your HTML file here or click to browse</span>
-                          <span className="text-xs text-white/30">.html files only</span>
-                        </>
-                      )}
-                    </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".html,text/html"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">
-                      Description <span className="text-white/40 text-xs">(Optional)</span>
-                    </label>
-                    <textarea
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Brief description of this template..."
-                      disabled={isSubmitting}
-                      rows={2}
-                      maxLength={500}
-                      className="w-full p-3 bg-black/20 border border-white/20 focus:border-white/40 rounded-lg text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                  </div>
-
-                  {/* Thumbnail URL */}
-                  <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">
-                      Thumbnail URL <span className="text-white/40 text-xs">(Optional)</span>
-                    </label>
-                    <input
-                      type="url"
-                      value={thumbnailUrl}
-                      onChange={(e) => setThumbnailUrl(e.target.value)}
-                      placeholder="https://example.com/thumbnail.png"
-                      disabled={isSubmitting}
-                      className="w-full p-3 bg-black/20 border border-white/20 focus:border-white/40 rounded-lg text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                  </div>
-
-                  {/* Footer */}
-                  <div className="flex justify-end gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={handleClose}
-                      disabled={isSubmitting}
-                      className="px-4 py-2 text-sm text-white/60 hover:text-white/90 transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                    <div className="relative group">
-                      <button
-                        type="submit"
-                        disabled={isSubmitting || !name.trim() || !htmlFile}
-                        className="relative px-4 py-2 text-sm bg-black/20 hover:bg-black/10 disabled:bg-black/40 disabled:opacity-50 disabled:cursor-not-allowed text-white/90 rounded-lg border border-white/30 transition-all duration-300 cursor-pointer overflow-hidden"
-                      >
-                        <div
-                          className="absolute inset-0 z-0 pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity duration-300"
-                          style={{
-                            background: "radial-gradient(circle, rgba(59,130,246,0.25) 0%, rgba(37,99,235,0.12) 50%, rgba(29,78,216,0) 100%)"
-                          }}
+                      {/* Name */}
+                      <div>
+                        <label className="block text-sm font-medium text-white/80 mb-2">
+                          Template Name <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          placeholder="e.g., Q4 Financial Report"
+                          autoFocus
+                          maxLength={100}
+                          className="w-full p-3 bg-black/20 border border-white/20 focus:border-white/40 rounded-lg text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-white/30"
                         />
-                        <span className="relative z-10 flex items-center gap-2">
-                          {isSubmitting ? (
+                      </div>
+
+                      {/* Image Upload */}
+                      <div>
+                        <label className="block text-sm font-medium text-white/80 mb-2">
+                          Template Image <span className="text-red-400">*</span>
+                        </label>
+                        <div
+                          onDrop={handleDrop}
+                          onDragOver={(e) => e.preventDefault()}
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`w-full border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center gap-3 transition-colors cursor-pointer
+                            ${imageFile ? 'border-white/30 bg-white/5' : 'border-white/15 hover:border-white/30 hover:bg-white/5'}`}
+                        >
+                          {imageFile ? (
                             <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Uploading...
+                              <ImageIcon className="w-6 h-6 text-white/60" />
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-white/80 truncate max-w-[280px]">{imageFile.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setImageFile(null)
+                                    if (fileInputRef.current) fileInputRef.current.value = ''
+                                  }}
+                                  className="text-white/40 hover:text-white/70 transition-colors"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                              <span className="text-xs text-white/40">
+                                {(imageFile.size / 1024).toFixed(1)} KB
+                              </span>
                             </>
                           ) : (
                             <>
-                              <Upload className="h-4 w-4" />
-                              Upload Template
+                              <Upload className="w-6 h-6 text-white/40" />
+                              <span className="text-sm text-white/60">Drop an image here or click to browse</span>
+                              <span className="text-xs text-white/30">PNG, JPG, WebP, GIF supported</span>
+                              <div className="flex items-center gap-1.5 mt-1 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+                                <Clock className="w-3 h-3 text-amber-400/70" />
+                                <span className="text-[11px] text-white/40">
+                                  Currently only images are allowed — document uploads coming soon
+                                </span>
+                              </div>
                             </>
                           )}
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                </form>
+                        </div>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                          onChange={handleFileChange}
+                          className="hidden"
+                        />
+                      </div>
+
+                      {/* Description */}
+                      <div>
+                        <label className="block text-sm font-medium text-white/80 mb-2">
+                          Description <span className="text-white/40 text-xs">(Optional)</span>
+                        </label>
+                        <textarea
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="Brief description of this template…"
+                          rows={2}
+                          maxLength={500}
+                          className="w-full p-3 bg-black/20 border border-white/20 focus:border-white/40 rounded-lg text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 resize-none"
+                        />
+                      </div>
+
+                      {/* Footer */}
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={handleClose}
+                          className="px-4 py-2 text-sm text-white/60 hover:text-white/90 transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <div className="relative group">
+                          <button
+                            type="submit"
+                            disabled={!name.trim() || !imageFile}
+                            className="relative px-4 py-2 text-sm bg-black/20 hover:bg-black/10 disabled:bg-black/40 disabled:opacity-50 disabled:cursor-not-allowed text-white/90 rounded-lg border border-white/30 transition-all duration-300 cursor-pointer overflow-hidden"
+                          >
+                            <div
+                              className="absolute inset-0 z-0 pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity duration-300"
+                              style={{
+                                background: "radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 50%, transparent 100%)"
+                              }}
+                            />
+                            <span className="relative z-10 flex items-center gap-2">
+                              <Upload className="h-4 w-4" />
+                              Upload Template
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </motion.form>
+                  )}
+                </AnimatePresence>
               </div>
             </motion.div>
           </DialogContent>

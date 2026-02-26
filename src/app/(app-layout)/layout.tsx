@@ -13,7 +13,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className='flex-1 w-full flex flex-row overflow-hidden'>
           {/* Sidebar toggle button - outside the sidebar */}
 
-         
+
           {children}
         </div>
       </div>

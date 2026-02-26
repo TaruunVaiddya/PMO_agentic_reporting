@@ -257,13 +257,7 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
   }, [isPaginating, pageCount, onPaginationComplete]);
 
   useEffect(() => {
-    // Debug logging
-    // console.log('[WebPreviewBody] Content update:', {
-    //   hasSrc: !!src,
-    //   htmlContentLength: htmlContent?.length || 0,
-    //   paginatedHtmlLength: paginatedHtml?.length || 0,
-    //   htmlContentPreview: htmlContent?.substring(0, 100),
-    // });
+
 
     if (src) {
       // If src is provided, clear srcDoc to use src instead
@@ -277,19 +271,15 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
       const customScrollbarStyles = `
         <style>
           * {
-            scrollbar-width: thin;
+            scrollbar-width: thick;
             scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
-          }
-          *::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
           }
           *::-webkit-scrollbar-track {
             background: transparent;
           }
           *::-webkit-scrollbar-thumb {
             background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
+            // border-radius: 3px;
             transition: background 0.2s ease;
           }
           *::-webkit-scrollbar-thumb:hover {

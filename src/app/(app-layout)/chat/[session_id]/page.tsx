@@ -397,7 +397,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
     <>
       <div className='flex-1 overflow-hidden'>
         <Conversation className="w-full h-full overflow-y-auto custom-scrollbar">
-          <ConversationContent className="max-w-3xl mx-auto">
+          <ConversationContent className="max-w-4xl mx-auto">
             {chatIds.length === 0 ? (
               <></>
             ) : (

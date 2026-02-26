@@ -22,10 +22,9 @@ import {
 } from '@/components/ai-elements/tool';
 import { CodeBlock } from '@/components/ai-elements/code-block';
 import { Copy, RefreshCw, ThumbsUp, ThumbsDown, Monitor, WrenchIcon, CircleIcon, ClockIcon, CheckCircleIcon, XCircleIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ChatStatus } from '@/types/chat';
-
+import { Shimmer } from "@/components/ai-elements/shimmer";
 // Use types from our centralized chat types
 export interface TaskData {
   id: string;
@@ -95,7 +94,7 @@ export const ChatMessage = React.memo(({
       idx: number;
       data: any;
     }> = [];
-    
+
     const toolCallsMap = new Map<string, { data: any; idx: number }>();
     const tasksMap = new Map<string, { data: any; idx: number }>();
     const textChunks: string[] = [];
@@ -105,7 +104,7 @@ export const ChatMessage = React.memo(({
     // Single pass through events for better performance
     for (let idx = 0; idx < message.events.length; idx++) {
       const event = message.events[idx];
-      
+
       switch (event.event) {
         case 'reasoning':
           if (event.data.delta) {
@@ -230,7 +229,7 @@ export const ChatMessage = React.memo(({
   return (
     <Message
       from={message.sender}
-      className="group/message w-full"
+      className="group/message w-full max-w-full"
     >
       <div className={cn(
         "w-full flex flex-col gap-2",
@@ -517,10 +516,11 @@ const ReasoningBlock = React.memo(({ data, status }: { data: any; status?: ChatS
 
 const ToolCallBlock = React.memo(({ toolCall, onPreviewClick }: { toolCall: any; onPreviewClick?: (toolCall: any, isAutoOpen?: boolean) => void }) => {
   const toolTitle = toolCall.name === 'generate_preview' ? 'Dashboard Preview' : toolCall.name || 'Tool';
-  
+
   return (
-    <div className="w-full">
-      <Tool className="border border-white/20 rounded-lg">
+    <div className="w-full max-w-full">
+      <Tool className="w-full border border-white/20 rounded-lg">
+
         <ToolHeader
           title={toolTitle}
           type={toolCall.name || 'tool'}
@@ -530,7 +530,7 @@ const ToolCallBlock = React.memo(({ toolCall, onPreviewClick }: { toolCall: any;
         <ToolContent>
           {/* Show input if available */}
           {toolCall.input && (
-            <div className="space-y-2 p-4">
+            <div className="space-y-2 p-4 max-w-full">
               <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                 Parameters
               </h4>
@@ -539,9 +539,9 @@ const ToolCallBlock = React.memo(({ toolCall, onPreviewClick }: { toolCall: any;
               </div>
             </div>
           )}
-          
+
           {/* Show output if available */}
-          <div className="p-4">
+          <div className="p-4 ">
             {(toolCall.output || toolCall.errorText) && (
               <div className="rounded-md bg-muted/50 border border-white/10 overflow-x-auto">
                 <ToolOutput
@@ -552,7 +552,7 @@ const ToolCallBlock = React.memo(({ toolCall, onPreviewClick }: { toolCall: any;
               </div>
             )}
           </div>
-          
+
           {/* Special handling for generate_preview tool */}
           {toolCall.state === 'output-available' && toolCall.name === 'generate_preview' && toolCall.output && (
             <div className="p-4 border-t">
@@ -651,8 +651,8 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate }
   // Auto-open preview when report event first appears (streaming only)
   React.useEffect(() => {
     const shouldAutoOpen = (report.state === 'input-streaming' || report.state === 'input-available')
-                          && onPreviewClick
-                          && !hasAutoOpenedRef.current;
+      && onPreviewClick
+      && !hasAutoOpenedRef.current;
 
     if (shouldAutoOpen) {
       hasAutoOpenedRef.current = true;

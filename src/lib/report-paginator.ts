@@ -144,6 +144,29 @@ function generatePageCSS(config: Required<PaginationConfig>): string {
   const { pageWidthMm, pageHeightMm, marginTopMm, marginBottomMm, marginLeftMm, marginRightMm, contentScale } = config;
 
   return `
+    /* Custom scrollbar */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(150, 150, 150, 0.4) transparent;
+    }
+    *::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    *::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    *::-webkit-scrollbar-thumb {
+      background: rgba(150, 150, 150, 0.4);
+      border-radius: 3px;
+    }
+    *::-webkit-scrollbar-thumb:hover {
+      background: rgba(150, 150, 150, 0.6);
+    }
+    *::-webkit-scrollbar-button {
+      display: none;
+    }
+
     /* Reset and base styles */
     *, *::before, *::after {
       box-sizing: border-box;
@@ -156,13 +179,14 @@ function generatePageCSS(config: Required<PaginationConfig>): string {
 
     /* Page container styles */
     .a4-page-container {
+      --page-scale: 1;
       background: #525659 !important;
       min-height: 100vh !important;
       padding: 20px !important;
       display: flex !important;
       flex-direction: column !important;
       align-items: center !important;
-      gap: 20px !important;
+      gap: calc(20px * var(--page-scale)) !important;
     }
 
     /* Individual A4 page - STRICT fixed dimensions */
@@ -179,6 +203,7 @@ function generatePageCSS(config: Required<PaginationConfig>): string {
       overflow: hidden !important;
       flex-shrink: 0 !important;
       flex-grow: 0 !important;
+      
     }
 
     /* Page header */
@@ -220,6 +245,8 @@ function generatePageCSS(config: Required<PaginationConfig>): string {
       .a4-page {
         box-shadow: none !important;
         page-break-after: always;
+        transform: none !important;
+        margin-bottom: 0 !important;
       }
 
       .a4-page:last-child {
@@ -230,7 +257,7 @@ function generatePageCSS(config: Required<PaginationConfig>): string {
     /* Responsive adjustments */
     @media screen and (max-width: 900px) {
       .a4-page-container {
-        padding: 10px !important;
+        // padding: 10px !important;
       }
 
       .a4-page {
@@ -332,7 +359,7 @@ function generatePaginationScript(config: Required<PaginationConfig>, bodyScript
               pageCount++;
               var page = document.createElement('div');
               page.className = 'a4-page';
-              page.style.cssText = 'width: ${pageWidthMm}mm !important; height: ${pageHeightMm}mm !important; min-height: ${pageHeightMm}mm !important; max-height: ${pageHeightMm}mm !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; flex-shrink: 0 !important; flex-grow: 0 !important; background: white !important; box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; position: relative !important;';
+              page.style.cssText = 'width: ${pageWidthMm}mm !important; height: ${pageHeightMm}mm !important; min-height: ${pageHeightMm}mm !important; max-height: ${pageHeightMm}mm !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; flex-shrink: 0 !important; flex-grow: 0 !important; background: white !important; box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; position: relative !important; margin: 0 auto !important; transform: scale(var(--page-scale)) !important; transform-origin: top center !important; margin-bottom: calc(${pageHeightMm}mm * (var(--page-scale) - 1)) !important;';
 
               if (headerTemplate) {
                 var header = document.createElement('div');
@@ -420,6 +447,21 @@ function generatePaginationScript(config: Required<PaginationConfig>, bodyScript
             contentSource.style.display = 'none';
             if (headerTemplate) headerTemplate.style.display = 'none';
             if (footerTemplate) footerTemplate.style.display = 'none';
+
+            // ── Dynamic Scaling for small screens ──
+            var mmToPx = 3.7795275591;
+            var pageWidthPx = ${pageWidthMm} * mmToPx;
+            var resizeObserver = new ResizeObserver(function(entries) {
+              for (var j = 0; j < entries.length; j++) {
+                var entry = entries[j];
+                // padding = 40px, scrollbar approx 15px
+                var availableWidth = entry.contentRect.width;
+                if (availableWidth === 0) continue; // Hidden
+                var scale = Math.min(1, (availableWidth - 40) / pageWidthPx);
+                container.style.setProperty('--page-scale', scale.toString());
+              }
+            });
+            resizeObserver.observe(container);
 
             window.__paginationComplete = true;
           }, 50);

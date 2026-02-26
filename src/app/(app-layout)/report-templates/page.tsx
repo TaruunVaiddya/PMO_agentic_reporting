@@ -12,6 +12,7 @@ import { SearchBar } from '@/components/ui/search-bar'
 import { FilterButton } from '@/components/ui/filter-button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { UploadTemplateModal } from '@/components/reports/upload-template-modal'
+import { TemplatePreviewModal } from '@/components/reports/template-preview-modal'
 import { TemplateCategory, TemplateData } from '@/lib/constants/report-templates'
 import { ReportCardData } from '@/components/reports/report-card'
 import { useSearchFilter } from '@/hooks/use-search-filter'
@@ -44,6 +45,8 @@ export default function ReportTemplates() {
   const [filterCategory, setFilterCategory] = useState<TemplateCategory>('all')
   const [showFilters, setShowFilters] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [previewTemplate, setPreviewTemplate] = useState<ReportCardData | null>(null)
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
 
   // Fetch all templates from API
   const { data: apiTemplates, error, isLoading, mutate } = useSWR<TemplateResponse[]>(
@@ -82,6 +85,11 @@ export default function ReportTemplates() {
   })
 
   const handleTemplateClick = (report: ReportCardData) => {
+    setPreviewTemplate(report)
+    setShowPreviewModal(true)
+  }
+
+  const handleUseTemplate = (report: ReportCardData) => {
     if (!report.id) return
     const params = new URLSearchParams({
       template_id: report.id,
@@ -139,14 +147,12 @@ export default function ReportTemplates() {
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-6">
-              {[...Array(8)].map((_, i) => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-5 pb-6">
+              {[...Array(12)].map((_, i) => (
                 <div key={i} className="border border-white/10 rounded-xl overflow-hidden">
-                  <div className="w-full h-32 bg-white/5 animate-pulse" />
-                  <div className="p-4 space-y-2">
-                    <div className="h-4 bg-white/5 rounded animate-pulse w-3/4" />
-                    <div className="h-3 bg-white/5 rounded animate-pulse w-full" />
-                    <div className="h-3 bg-white/5 rounded animate-pulse w-1/2" />
+                  <div className="w-full aspect-[4/5] bg-white/5 animate-pulse" />
+                  <div className="p-3">
+                    <div className="h-4 bg-white/5 rounded animate-pulse w-3/4 mx-auto" />
                   </div>
                 </div>
               ))}
@@ -274,8 +280,9 @@ export default function ReportTemplates() {
               <ReportGrid
                 reports={filteredTemplates}
                 onReportClick={handleTemplateClick}
+                onUseTemplate={handleUseTemplate}
                 onDelete={handleDeleteTemplate}
-                columns={4}
+                columns={6}
               />
             </div>
           ) : (
@@ -295,6 +302,13 @@ export default function ReportTemplates() {
         open={showUploadModal}
         onOpenChange={setShowUploadModal}
         onSuccess={() => mutate()}
+      />
+
+      <TemplatePreviewModal
+        template={previewTemplate}
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        onUseTemplate={handleUseTemplate}
       />
     </div>
   )

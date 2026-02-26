@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { CodeBlock } from "./code-block";
+import { Shimmer } from "./shimmer";
+import { Spinner } from "@/components/ui/spinner"
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 
@@ -51,9 +53,9 @@ const getStatusBadge = (status: ToolUIPart["state"]) => {
   } as const;
 
   return (
-    <Badge className="gap-1.5 rounded-full text-xs" variant="secondary">
+    <Badge className="rounded-full p-1 text-xs" variant="secondary">
       {icons[status]}
-      {labels[status]}
+      {/* {labels[status]} */}
     </Badge>
   );
 };
@@ -64,24 +66,42 @@ export const ToolHeader = ({
   type,
   state,
   ...props
-}: ToolHeaderProps) => (
-  <CollapsibleTrigger
-    className={cn(
-      "flex w-full items-center justify-between gap-4 p-3",
-      className
-    )}
-    {...props}
-  >
-    <div className="flex items-center gap-2">
-      <WrenchIcon className="size-4 text-muted-foreground" />
-      <span className="font-medium text-sm">
-        {title ?? type.split("-").slice(1).join("-")}
-      </span>
-      {getStatusBadge(state)}
-    </div>
-    <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-  </CollapsibleTrigger>
-);
+}: ToolHeaderProps) => {
+  const isLoading = state == 'input-streaming' || state == 'input-available'
+  return (
+    <CollapsibleTrigger
+      className={cn(
+        "flex w-full items-center justify-between gap-4 p-3",
+        className
+      )}
+      {...props}
+    >
+
+      <div className="flex items-center gap-2">
+        <WrenchIcon className="size-4 text-muted-foreground" />
+        <span className="font-medium text-sm">
+          {
+            isLoading ? (
+              <Shimmer>
+                {title ?? type.split("-").slice(1).join("-")}
+              </Shimmer>
+            ) : (
+              title ?? type.split("-").slice(1).join("-")
+            )
+          }
+        </span>
+        {getStatusBadge(state)}
+      </div>
+      {
+        isLoading ? (
+          <Spinner data-icon="inline-start text-muted-foreground" />
+        ) : (
+          <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+        )
+      }
+    </CollapsibleTrigger>
+  )
+};
 
 export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
 
