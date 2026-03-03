@@ -68,6 +68,7 @@ interface ChatMessageProps {
   onDislike: (messageId: string) => void;
   onPreviewClick?: (toolCall: ToolCallData, isAutoOpen?: boolean) => void;
   onReportOutputUpdate?: (report: any) => void;
+  activeReportId?: string | null;
   status?: ChatStatus
 }
 
@@ -79,6 +80,7 @@ export const ChatMessage = React.memo(({
   onDislike,
   onPreviewClick,
   onReportOutputUpdate,
+  activeReportId,
   status
 }: ChatMessageProps) => {
   const isUser = message.sender === 'user';
@@ -276,6 +278,7 @@ export const ChatMessage = React.memo(({
                     report={item.data}
                     onPreviewClick={onPreviewClick}
                     onReportOutputUpdate={onReportOutputUpdate}
+                    isActive={activeReportId === item.data.id}
                   />
                 );
               }
@@ -619,10 +622,11 @@ const TaskBlock = React.memo(({ task }: { task: any }) => (
   );
 });
 
-const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate }: {
+const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate, isActive }: {
   report: any;
   onPreviewClick?: (report: any, isAutoOpen?: boolean) => void;
   onReportOutputUpdate?: (report: any) => void;
+  isActive?: boolean;
 }) => {
   const reportTitle = report.name || 'Web Report';
   const isCompleted = report.state === 'output-available';
@@ -761,12 +765,18 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate }
   return (
     <div
       className={cn(
-        "w-full rounded-lg border border-white/20 bg-muted/10 p-4 transition-all duration-200",
+        "w-full rounded-lg border border-white/20 bg-muted/10 p-4 transition-all duration-200 relative",
         isCompleted && !isLoadingReport && "cursor-pointer hover:border-primary/50 hover:bg-muted/30",
-        isLoadingReport && "opacity-75"
+        isLoadingReport && "opacity-75",
+        isActive && "border-primary ring-1 ring-primary/50 bg-primary/5"
       )}
       onClick={handleFetchAndPreview}
     >
+      {isActive && (
+        <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-in zoom-in duration-300">
+          NOW VIEWING
+        </div>
+      )}
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 mt-1">
           {statusInfo.icon}
@@ -808,7 +818,8 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate }
     prevProps.report.state === nextProps.report.state &&
     prevProps.report.output === nextProps.report.output &&
     prevProps.report.name === nextProps.report.name &&
-    prevProps.report.errorText === nextProps.report.errorText
+    prevProps.report.errorText === nextProps.report.errorText &&
+    prevProps.isActive === nextProps.isActive
   );
 });
 

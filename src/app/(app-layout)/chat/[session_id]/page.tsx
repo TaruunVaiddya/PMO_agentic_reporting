@@ -182,7 +182,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
   });
 
   const [previewMode, setPreviewMode] = useState<PreviewMode>('view');
-  const [pageOrientation, setPageOrientation] = useState<PageOrientation>('portrait');
+  const [pageOrientation, setPageOrientation] = useState<PageOrientation>('original');
 
   // Handle mode change
   const handleModeChange = React.useCallback(
@@ -285,10 +285,6 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
 
     // If this is an auto-open, check if we should skip it
     if (isAutoOpen) {
-      // Skip if preview is already visible (use ref to avoid dependency)
-      if (previewDataRef.current.isVisible) {
-        return;
-      }
       // Skip if this report has already been auto-opened
       if (autoOpenedReportsRef.current.has(reportId)) {
         return;
@@ -412,6 +408,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
                   onDislike={handleDislike}
                   onPreviewClick={handlePreviewClick}
                   onReportOutputUpdate={handleReportOutputUpdate}
+                  activeReportId={previewData.reportId}
                 />
               ))
             )}
@@ -510,4 +507,3 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
     </div>
   );
 });
-

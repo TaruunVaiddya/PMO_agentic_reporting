@@ -71,7 +71,7 @@ export const ToolHeader = ({
   return (
     <CollapsibleTrigger
       className={cn(
-        "flex w-full items-center justify-between gap-4 p-3",
+        "flex w-full items-center justify-between gap-4 p-3 py-2",
         className
       )}
       {...props}
@@ -79,7 +79,7 @@ export const ToolHeader = ({
 
       <div className="flex items-center gap-2">
         <WrenchIcon className="size-4 text-muted-foreground" />
-        <span className="font-medium text-sm">
+        <span className="font-medium text-sm text-white/70">
           {
             isLoading ? (
               <Shimmer>
@@ -90,13 +90,13 @@ export const ToolHeader = ({
             )
           }
         </span>
-        {getStatusBadge(state)}
       </div>
       {
         isLoading ? (
           <Spinner data-icon="inline-start text-muted-foreground" />
         ) : (
-          <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+          <>{getStatusBadge(state)}</>
+          // <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
         )
       }
     </CollapsibleTrigger>

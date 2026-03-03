@@ -180,7 +180,7 @@ function generatePageCSS(config: Required<PaginationConfig>): string {
     /* Page container styles */
     .a4-page-container {
       --page-scale: 1;
-      background: #525659 !important;
+      background: transparent !important;
       min-height: 100vh !important;
       padding: 20px !important;
       display: flex !important;

@@ -14,6 +14,7 @@ interface ChatMessageItemProps {
   onDislike: (messageId: string) => void;
   onPreviewClick?: (toolCall: any) => void;
   onReportOutputUpdate?: (report: any) => void;
+  activeReportId?: string | null;
 }
 
 /**
@@ -27,7 +28,8 @@ const ChatMessageItem = React.memo(({
   onLike,
   onDislike,
   onPreviewClick,
-  onReportOutputUpdate
+  onReportOutputUpdate,
+  activeReportId
 }: ChatMessageItemProps) => {
   // Subscribe to this specific chat item
   const chatItem = useChatItem(chatId);
@@ -51,7 +53,7 @@ const ChatMessageItem = React.memo(({
     // Add assistant message
     if (chatItem.assistantMessage) {
       const assistantMsg = chatItem.assistantMessage;
-      
+
       // Check if content is events array or string
       if (Array.isArray(assistantMsg.content)) {
         // Pass events array directly
@@ -83,7 +85,7 @@ const ChatMessageItem = React.memo(({
 
   // Check if we should show loading indicator
   const shouldShowLoading = chatItem?.status === 'Not_Started' ||
-                             (chatItem?.userMessage && !chatItem?.assistantMessage);
+    (chatItem?.userMessage && !chatItem?.assistantMessage);
 
   // Check if we should show error message
   const shouldShowError = chatItem?.status === 'Failed' && !chatItem?.assistantMessage;
@@ -101,6 +103,7 @@ const ChatMessageItem = React.memo(({
           onPreviewClick={onPreviewClick}
           onReportOutputUpdate={onReportOutputUpdate}
           status={chatItem?.status}
+          activeReportId={activeReportId}
         />
       ))}
       {shouldShowLoading && <ChatLoadingIndicator />}
@@ -145,8 +148,11 @@ const ChatMessageItem = React.memo(({
     </>
   );
 }, (prevProps, nextProps) => {
-  // Only re-render if chatId changes
-  return prevProps.chatId === nextProps.chatId;
+  // Re-render if chatId or activeReportId changes
+  return (
+    prevProps.chatId === nextProps.chatId &&
+    prevProps.activeReportId === nextProps.activeReportId
+  );
 });
 
 ChatMessageItem.displayName = 'ChatMessageItem';

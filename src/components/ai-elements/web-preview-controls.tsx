@@ -6,12 +6,24 @@ import {
   WebPreviewNavigationButton,
   WebPreviewUrl,
 } from './web-preview-vercel';
-import { RotateCcw, ExternalLink, X, Edit3, Eye, Download, Loader2, RectangleVertical, RectangleHorizontal } from 'lucide-react';
+import { RotateCcw, ExternalLink, X, Edit3, Eye, Download, Loader2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { capturePdfFromIframe, printToPdf } from '@/lib/pdf-utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export type PreviewMode = 'view' | 'edit';
-export type PageOrientation = 'portrait' | 'landscape';
+export type PageOrientation = 'original' | 'portrait' | 'landscape';
+
+const ORIENTATION_LABELS: Record<PageOrientation, string> = {
+  original: 'Original',
+  portrait: 'A4 Portrait',
+  landscape: 'A4 Landscape',
+};
 
 interface WebPreviewControlsProps {
   title: string;
@@ -31,7 +43,7 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
   htmlContent,
   mode = 'view',
   onModeChange,
-  orientation = 'portrait',
+  orientation = 'original',
   onOrientationChange,
   onReload,
   onClose,
@@ -55,13 +67,15 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
     try {
       // Get the actual preview iframe if available
       const previewIframe = getPreviewIframe?.();
+      // For PDF, use portrait/landscape (original → portrait for export)
+      const pdfOrientation = orientation === 'landscape' ? 'landscape' : 'portrait';
 
       if (previewIframe && previewIframe.contentDocument) {
         // Use the already-rendered iframe
-        await capturePdfFromIframe(previewIframe, title, orientation);
+        await capturePdfFromIframe(previewIframe, title, pdfOrientation);
       } else {
         // Fallback: use browser print
-        await printToPdf(htmlContent, title, orientation);
+        await printToPdf(htmlContent, title, pdfOrientation);
       }
     } catch (error) {
       console.error('Failed to generate PDF:', error);
@@ -115,33 +129,34 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
           </button>
         </div>
 
-        {/* Orientation Toggle */}
-        <div className="flex items-center bg-muted/50 rounded-md p-0.5">
-          <button
-            onClick={() => onOrientationChange?.('portrait')}
-            className={cn(
-              "flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-all",
-              orientation === 'portrait'
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            title="Portrait"
-          >
-            <RectangleVertical className="size-3.5" />
-          </button>
-          <button
-            onClick={() => onOrientationChange?.('landscape')}
-            className={cn(
-              "flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-all",
-              orientation === 'landscape'
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            title="Landscape"
-          >
-            <RectangleHorizontal className="size-3.5" />
-          </button>
-        </div>
+        {/* View Layout Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all",
+                "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted/80",
+              )}
+            >
+              <span>{ORIENTATION_LABELS[orientation]}</span>
+              <ChevronDown className="size-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[140px]">
+            {(Object.keys(ORIENTATION_LABELS) as PageOrientation[]).map((key) => (
+              <DropdownMenuItem
+                key={key}
+                onClick={() => onOrientationChange?.(key)}
+                className={cn(
+                  "cursor-pointer text-xs",
+                  orientation === key && "bg-accent font-semibold"
+                )}
+              >
+                {ORIENTATION_LABELS[key]}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <WebPreviewNavigationButton
           tooltip="Download PDF"

@@ -194,7 +194,7 @@ export const WebPreviewUrl: React.FC<WebPreviewUrlProps> = ({
 };
 
 // WebPreviewBody Component
-export type PageOrientation = 'portrait' | 'landscape';
+export type PageOrientation = 'original' | 'portrait' | 'landscape';
 
 export interface WebPreviewBodyProps {
   src?: string;
@@ -212,7 +212,122 @@ export interface WebPreviewBodyProps {
   onIframeRef?: (iframe: HTMLIFrameElement | null) => void;
 }
 
-export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
+const LoadingOverlay = () => (
+  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-background to-muted/30 z-10">
+    <div className="flex flex-col items-center gap-6 animate-in fade-in duration-500">
+      <div className="relative">
+        <div className="w-20 h-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <svg className="w-10 h-10 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+      </div>
+      <div className="text-center space-y-2">
+        <h3 className="text-xl font-semibold text-foreground">Generating Your Report</h3>
+        <p className="text-sm text-muted-foreground max-w-md">
+          Your interactive report is being created. This will only take a moment...
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+        <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+        <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+      </div>
+    </div>
+  </div>
+);
+
+// Shared isolation styles to prevent app theme leaking
+const iframeIsolationStyles = `
+  <style data-isolation="true">
+    :where(html) { background: transparent; }
+    :where(body) {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+      color: #000;
+      background: transparent;
+    }
+    * { scrollbar-width: thick; scrollbar-color: rgba(128, 128, 128, 0.3) transparent; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.3); transition: background 0.2s ease; }
+    *::-webkit-scrollbar-thumb:hover { background: rgba(128, 128, 128, 0.5); }
+    *::-webkit-scrollbar-button { display: none; }
+  </style>
+`;
+
+const WebPreviewOriginal: React.FC<WebPreviewBodyProps> = ({
+  src,
+  htmlContent,
+  className,
+  onIframeRef,
+}) => {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const { setIsLoading } = useWebPreview();
+  const [iframeSrcDoc, setIframeSrcDoc] = React.useState<string>('');
+
+  const injectOriginalIsolation = (html: string): string => {
+    const originalViewStyles = `
+      <style data-original-view="true">
+        body {
+          background: #fff !important;
+          max-width: 70%;
+          margin: 32px auto !important;
+          padding: 40px !important;
+          min-height: calc(100vh - 64px);
+          overflow-y: auto;
+          box-sizing: border-box;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+          border-radius: 4px !important;
+        }
+        @media screen and (max-width: 900px) {
+          body {
+            max-width: 95%;
+            margin: 16px auto !important;
+            padding: 24px !important;
+            min-height: calc(100vh - 32px);
+          }
+        }
+      </style>
+    `;
+    const allStyles = iframeIsolationStyles + originalViewStyles;
+
+    if (html.includes('data-isolation="true"')) return html;
+    if (html.includes('</head>')) return html.replace('</head>', `${allStyles}</head>`);
+    if (html.includes('<html>')) return html.replace('<html>', `<html><head>${allStyles}</head>`);
+    return `<!DOCTYPE html><html><head>${allStyles}</head><body>${html}</body></html>`;
+  };
+
+  useEffect(() => {
+    if (src) {
+      setIframeSrcDoc('');
+    } else if (htmlContent) {
+      setIframeSrcDoc(injectOriginalIsolation(htmlContent));
+    }
+  }, [htmlContent, src]);
+
+  useEffect(() => {
+    onIframeRef?.(iframeRef.current);
+  }, [iframeSrcDoc, onIframeRef]);
+
+  const hasContent = !!(htmlContent || src);
+
+  return (
+    <div className={cn('flex-1 bg-black/40 overflow-hidden relative', className)}>
+      {!hasContent && <LoadingOverlay />}
+      <iframe
+        ref={iframeRef}
+        src={src}
+        srcDoc={iframeSrcDoc || undefined}
+        className={cn("w-full h-full border-0", !hasContent && "opacity-0")}
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+        onLoad={() => setIsLoading(false)}
+        title="Preview"
+      />
+    </div>
+  );
+};
+
+const WebPreviewPaginated: React.FC<WebPreviewBodyProps> = ({
   src,
   htmlContent,
   className,
@@ -225,19 +340,16 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { setIsLoading } = useWebPreview();
-
   const [iframeSrcDoc, setIframeSrcDoc] = React.useState<string>('');
   const editModeAppliedRef = useRef(false);
 
-  // Build pagination config based on orientation
   const paginationConfig = React.useMemo(() => {
     if (orientation === 'landscape') {
       return { pageWidthMm: 297, pageHeightMm: 210, contentScale: 0.75 };
     }
-    return {}; // defaults to portrait (210x297)
+    return {};
   }, [orientation]);
 
-  // Use pagination hook for HTML content
   const {
     paginatedHtml,
     isPaginating,
@@ -249,72 +361,43 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
     debounceMs: 150,
   });
 
-  // Notify parent about pagination completion
   useEffect(() => {
     if (!isPaginating && pageCount > 0) {
       onPaginationComplete?.(pageCount);
     }
   }, [isPaginating, pageCount, onPaginationComplete]);
 
+  const injectPaginatedIsolation = (html: string): string => {
+    const a4ViewStyles = `
+      <style data-a4-view="true">
+        body { background: transparent; }
+      </style>
+    `;
+    const allStyles = iframeIsolationStyles + a4ViewStyles;
+
+    if (html.includes('data-isolation="true"')) return html;
+    if (html.includes('</head>')) return html.replace('</head>', `${allStyles}</head>`);
+    if (html.includes('<html>')) return html.replace('<html>', `<html><head>${allStyles}</head>`);
+    return `<!DOCTYPE html><html><head>${allStyles}</head><body>${html}</body></html>`;
+  };
+
   useEffect(() => {
-
-
     if (src) {
-      // If src is provided, clear srcDoc to use src instead
       setIframeSrcDoc('');
     } else if (paginatedHtml) {
-      // Use the paginated HTML
-      // console.log('[WebPreviewBody] Using paginatedHtml');
-      setIframeSrcDoc(paginatedHtml);
+      setIframeSrcDoc(injectPaginatedIsolation(paginatedHtml));
     } else if (htmlContent) {
-      // Inject custom scrollbar styles into the HTML content
-      const customScrollbarStyles = `
-        <style>
-          * {
-            scrollbar-width: thick;
-            scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
-          }
-          *::-webkit-scrollbar-track {
-            background: transparent;
-          }
-          *::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            // border-radius: 3px;
-            transition: background 0.2s ease;
-          }
-          *::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
-          }
-          *::-webkit-scrollbar-button {
-            display: none;
-          }
-        </style>
-      `;
-
-      // Inject styles into the head of the HTML document
-      let modifiedHtml = htmlContent;
-      if (htmlContent.includes('</head>')) {
-        modifiedHtml = htmlContent.replace('</head>', `${customScrollbarStyles}</head>`);
-      } else if (htmlContent.includes('<html>')) {
-        modifiedHtml = htmlContent.replace('<html>', `<html><head>${customScrollbarStyles}</head>`);
-      } else {
-        modifiedHtml = `<!DOCTYPE html><html><head>${customScrollbarStyles}</head><body>${htmlContent}</body></html>`;
-      }
-
-      setIframeSrcDoc(modifiedHtml);
+      setIframeSrcDoc(injectPaginatedIsolation(htmlContent));
     }
   }, [paginatedHtml, htmlContent, src]);
 
-  // Handle edit mode changes
   useEffect(() => {
     if (!iframeRef.current) return;
-
     const iframe = iframeRef.current;
 
     if (editMode && !editModeAppliedRef.current) {
-      // Wait for iframe to be fully loaded AND pagination to complete
       let attempts = 0;
-      const maxAttempts = 50; // 50 * 100ms = 5 seconds max
+      const maxAttempts = 50;
 
       const tryEnableEditMode = () => {
         attempts++;
@@ -322,15 +405,12 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
         const iframeWin = iframe.contentWindow as any;
 
         if (!iframeDoc || iframeDoc.readyState !== 'complete') {
-          // Iframe not loaded yet — retry
           if (attempts < maxAttempts) setTimeout(tryEnableEditMode, 100);
           return;
         }
 
-        // Check if pagination is in progress (has container but not yet complete)
         const hasPagination = !!iframeDoc.querySelector('.a4-page-container');
         if (hasPagination && !iframeWin?.__paginationComplete) {
-          // Pagination still running — retry
           if (attempts < maxAttempts) setTimeout(tryEnableEditMode, 100);
           return;
         }
@@ -341,17 +421,14 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
 
       tryEnableEditMode();
     } else if (!editMode && editModeAppliedRef.current) {
-      // Reset flag when edit mode is disabled
       editModeAppliedRef.current = false;
     }
   }, [editMode, iframeSrcDoc, onEditModeReady]);
 
-  // Reset edit mode flag when content changes
   useEffect(() => {
     editModeAppliedRef.current = false;
   }, [htmlContent, src]);
 
-  // Expose iframe ref to parent
   useEffect(() => {
     onIframeRef?.(iframeRef.current);
   }, [iframeSrcDoc, onIframeRef]);
@@ -360,40 +437,9 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
   const showPaginationIndicator = isPaginating && hasContent;
 
   return (
-    <div className={cn('flex-1 bg-muted/20 overflow-hidden relative', className)}>
-      {/* Loading state - no content yet */}
-      {!hasContent && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-background to-muted/30 z-10">
-          <div className="flex flex-col items-center gap-6 animate-in fade-in duration-500">
-            {/* Animated icon */}
-            <div className="relative">
-              <div className="w-20 h-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <svg className="w-10 h-10 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-            </div>
+    <div className={cn('flex-1 bg-black/40 overflow-hidden relative', className)}>
+      {!hasContent && <LoadingOverlay />}
 
-            {/* Loading text */}
-            <div className="text-center space-y-2">
-              <h3 className="text-xl font-semibold text-foreground">Generating Your Report</h3>
-              <p className="text-sm text-muted-foreground max-w-md">
-                Your interactive report is being created. This will only take a moment...
-              </p>
-            </div>
-
-            {/* Animated dots */}
-            <div className="flex gap-2">
-              <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Pagination indicator overlay */}
       {showPaginationIndicator && (
         <div className="absolute top-2 right-2 z-20 flex items-center gap-2 px-3 py-1.5 bg-background/90 border border-border rounded-md shadow-sm">
           <div className="w-3 h-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
@@ -401,7 +447,6 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
         </div>
       )}
 
-      {/* Page count badge (shown after pagination) */}
       {wasPaginated && pageCount > 1 && !isPaginating && (
         <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 px-2.5 py-1 bg-background/90 border border-border rounded-md shadow-sm">
           <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -422,6 +467,13 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
       />
     </div>
   );
+};
+
+export const WebPreviewBody: React.FC<WebPreviewBodyProps> = (props) => {
+  if (props.orientation === 'original') {
+    return <WebPreviewOriginal {...props} />;
+  }
+  return <WebPreviewPaginated {...props} />;
 };
 
 WebPreview.displayName = 'WebPreview';
