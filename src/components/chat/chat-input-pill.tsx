@@ -140,9 +140,9 @@ export function ChatInputPill({
       <form onSubmit={handleSubmit} className={cn("w-full", className)}>
         <div className={cn(
           "relative flex items-center gap-2 px-4 py-2.5",
-          "bg-black/40 backdrop-blur-sm border border-white/15",
-          "rounded-full shadow-2xl transition-all duration-200",
-          "hover:border-white/20 focus-within:border-white/30",
+          "bg-background/80 dark:bg-black/40 backdrop-blur-md border border-border",
+          "rounded-full shadow-lg transition-all duration-200",
+          "hover:border-primary/20 focus-within:border-primary/30",
           disabled && "opacity-50 cursor-not-allowed"
         )}>
           {/* Plus icon dropdown for mode selection */}
@@ -157,24 +157,24 @@ export function ChatInputPill({
               )}
             >
               {selectedMode ? (
-                <div className="flex items-center gap-1.5 text-white/90">
+                <div className="flex items-center gap-1.5 text-foreground/90">
                   {getModeIcon()}
                 </div>
               ) : (
-                <Plus className="h-5 w-5 text-white/60" />
+                <Plus className="h-5 w-5 text-muted-foreground" />
               )}
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="start"
               side="top"
-              className="bg-black/90 backdrop-blur-sm border-white/15 min-w-[220px]"
+              className="bg-popover border-border min-w-[220px]"
             >
               <DropdownMenuItem
                 onClick={() => handleModeSelect('web-search')}
                 className={cn(
                   "cursor-pointer flex items-center gap-2 px-3 py-2.5",
-                  "text-white/90 hover:!bg-white/10 hover:!text-white focus:!bg-white/10 focus:!text-white",
-                  selectedMode === 'web-search' && "bg-white/5"
+                  "text-popover-foreground hover:bg-muted focus:bg-muted",
+                  selectedMode === 'web-search' && "bg-muted/50"
                 )}
               >
                 <Globe className="h-4 w-4" />
@@ -187,8 +187,8 @@ export function ChatInputPill({
                 onClick={() => handleModeSelect('report-generation')}
                 className={cn(
                   "cursor-pointer flex items-center gap-2 px-3 py-2.5",
-                  "text-white/90 hover:!bg-white/10 hover:!text-white focus:!bg-white/10 focus:!text-white",
-                  selectedMode === 'report-generation' && "bg-white/5"
+                  "text-popover-foreground hover:bg-muted focus:bg-muted",
+                  selectedMode === 'report-generation' && "bg-muted/50"
                 )}
               >
                 <FileText className="h-4 w-4" />
@@ -205,7 +205,7 @@ export function ChatInputPill({
                       setDropdownOpen(false);
                       setShowTemplatePicker(true);
                     }}
-                    className="p-1 rounded hover:bg-white/15 text-white/40 hover:text-white transition-colors"
+                    className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                     title="Select template"
                   >
                     <LayoutTemplate className="h-3.5 w-3.5" />
@@ -216,8 +216,8 @@ export function ChatInputPill({
                 onClick={() => handleModeSelect('data-qa')}
                 className={cn(
                   "cursor-pointer flex items-center gap-2 px-3 py-2.5",
-                  "text-white/90 hover:!bg-white/10 hover:!text-white focus:!bg-white/10 focus:!text-white",
-                  selectedMode === 'data-qa' && "bg-white/5"
+                  "text-popover-foreground hover:bg-muted focus:bg-muted",
+                  selectedMode === 'data-qa' && "bg-muted/50"
                 )}
               >
                 <MessageCircleQuestion className="h-4 w-4" />
@@ -230,8 +230,8 @@ export function ChatInputPill({
                 onClick={() => handleModeSelect('deep-research')}
                 className={cn(
                   "cursor-pointer flex items-center gap-2 px-3 py-2.5",
-                  "text-white/90 hover:!bg-white/10 hover:!text-white focus:!bg-white/10 focus:!text-white",
-                  selectedMode === 'deep-research' && "bg-white/5"
+                  "text-popover-foreground hover:bg-muted focus:bg-muted",
+                  selectedMode === 'deep-research' && "bg-muted/50"
                 )}
               >
                 <Binoculars className="h-4 w-4" />
@@ -242,10 +242,10 @@ export function ChatInputPill({
               </DropdownMenuItem>
               {selectedMode && (
                 <>
-                  <div className="h-px bg-white/10 my-1" />
+                  <div className="h-px bg-border my-1" />
                   <DropdownMenuItem
                     onClick={() => handleModeSelect(null)}
-                    className="cursor-pointer text-white/60 hover:!bg-white/10 hover:!text-white/80 focus:!bg-white/10 focus:!text-white/80 px-3 py-2"
+                    className="cursor-pointer text-muted-foreground hover:bg-muted hover:text-foreground px-3 py-2"
                   >
                     <span className="text-sm">Clear selection</span>
                   </DropdownMenuItem>
@@ -256,8 +256,8 @@ export function ChatInputPill({
 
           {/* Mode indicator badge — hidden when template is selected (implies report mode) */}
           {selectedMode && !selectedTemplate && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/20 rounded-full border border-blue-500/30">
-              <span className="text-xs text-blue-300 font-medium whitespace-nowrap">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 rounded-full border border-primary/20">
+              <span className="text-xs text-primary font-medium whitespace-nowrap">
                 {getModeLabel()}
               </span>
             </div>
@@ -265,15 +265,15 @@ export function ChatInputPill({
 
           {/* Template indicator badge — inline with 15-char truncation */}
           {selectedTemplate && (
-            <div className="flex items-center gap-1 px-2 py-1 bg-white/10 rounded-full border border-white/20">
-              <LayoutTemplate className="h-3 w-3 text-white/50 shrink-0" />
-              <span className="text-xs text-white/70 font-medium whitespace-nowrap">
+            <div className="flex items-center gap-1 px-2 py-1 bg-muted rounded-full border border-border">
+              <LayoutTemplate className="h-3 w-3 text-muted-foreground shrink-0" />
+              <span className="text-xs text-foreground/70 font-medium whitespace-nowrap">
                 {truncateName(selectedTemplate.name)}
               </span>
               <button
                 type="button"
                 onClick={() => setSelectedTemplate(null)}
-                className="p-0.5 rounded-full hover:bg-white/15 text-white/40 hover:text-white transition-colors shrink-0"
+                className="p-0.5 rounded-full hover:bg-muted-foreground/10 text-muted-foreground hover:text-foreground transition-colors shrink-0"
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -290,10 +290,10 @@ export function ChatInputPill({
             disabled={disabled}
             rows={1}
             className={cn(
-              "flex-1 bg-transparent text-white/90 placeholder:text-white/40",
+              "flex-1 bg-transparent text-foreground placeholder:text-muted-foreground/60",
               "text-sm resize-none outline-none",
               "disabled:cursor-not-allowed min-h-[24px] max-h-[120px]",
-              "scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+              "scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
             )}
           />
 
@@ -303,10 +303,10 @@ export function ChatInputPill({
             disabled={!inputValue.trim() || isSubmitting || disabled}
             className={cn(
               "flex items-center justify-center w-8 h-8 rounded-full",
-              "bg-white text-black transition-all duration-200",
-              "hover:bg-white/90 active:scale-95",
-              "disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white disabled:active:scale-100",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+              "bg-primary text-primary-foreground transition-all duration-200",
+              "hover:bg-primary/90 active:scale-95",
+              "disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-primary disabled:active:scale-100",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             )}
           >
             {isSubmitting ? (

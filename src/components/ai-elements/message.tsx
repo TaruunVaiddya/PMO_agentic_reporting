@@ -29,14 +29,14 @@ const messageContentVariants = cva(
     variants: {
       variant: {
         contained: [
-          "max-w-[100%] px-4 py-2.5 rounded-2xl",
-          // User message - black/white theme
-          "group-[.is-user]:bg-white/10 group-[.is-user]:text-white/90",
-          "group-[.is-user]:border group-[.is-user]:border-white/20",
-          // Assistant message - gray theme
-          "group-[.is-assistant]:bg-gray-100 dark:group-[.is-assistant]:bg-transparent",
-          "group-[.is-assistant]:text-gray-900 dark:group-[.is-assistant]:text-[#E0E0E0]",
-          "group-[.is-assistant]:border-none group-[.is-assistant]:border-gray-200 dark:group-[.is-assistant]:border-zinc-700",
+          "max-w-[100%] px-4 py-2.5 rounded-2xl border",
+          // User message - Branded Blue Theme
+          "group-[.is-user]:bg-[#1a2456]/10 group-[.is-user]:text-[#1a2456]",
+          "group-[.is-user]:border-[#1a2456]/20",
+          // Assistant message - Adaptive Neutral Theme
+          "group-[.is-assistant]:bg-muted/50 dark:group-[.is-assistant]:bg-transparent",
+          "group-[.is-assistant]:text-foreground dark:group-[.is-assistant]:text-[#E0E0E0]",
+          "group-[.is-assistant]:border-border dark:group-[.is-assistant]:border-zinc-700",
         ],
         flat: [
           "group-[.is-user]:max-w-[100%] group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",

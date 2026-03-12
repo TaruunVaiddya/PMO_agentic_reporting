@@ -137,22 +137,22 @@ export default function ReportTemplates() {
   if (isLoading) {
     return (
       <div className="w-full max-h-[97vh]">
-        <div className="bg-gray-900/10 py-6 px-8 w-full h-full flex flex-col rounded-xl border-t border-white/10">
+        <div className="bg-slate-50 py-6 px-8 w-full h-full flex flex-col rounded-xl border-t border-slate-200">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 flex-shrink-0">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
               <BackButton onClick={() => router.back()} />
-              <div className="h-10 w-64 bg-white/5 rounded-lg animate-pulse" />
+              <div className="h-10 w-64 bg-slate-100 rounded-lg animate-pulse" />
             </div>
-            <div className="h-10 w-32 bg-white/5 rounded-lg animate-pulse" />
+            <div className="h-10 w-32 bg-slate-100 rounded-lg animate-pulse" />
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-5 pb-6">
               {[...Array(12)].map((_, i) => (
-                <div key={i} className="border border-white/10 rounded-xl overflow-hidden">
-                  <div className="w-full aspect-[4/5] bg-white/5 animate-pulse" />
+                <div key={i} className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                  <div className="w-full aspect-[4/5] bg-slate-100 animate-pulse" />
                   <div className="p-3">
-                    <div className="h-4 bg-white/5 rounded animate-pulse w-3/4 mx-auto" />
+                    <div className="h-4 bg-slate-100 rounded animate-pulse w-3/4 mx-auto" />
                   </div>
                 </div>
               ))}
@@ -193,7 +193,7 @@ export default function ReportTemplates() {
     return (
       <>
         <div className="w-full max-h-[97vh]">
-          <div className="bg-gray-900/10 py-6 px-8 w-full h-full flex flex-col rounded-xl border-t border-white/10">
+          <div className="bg-slate-50 py-6 px-8 w-full h-full flex flex-col rounded-xl border-t border-slate-200">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 flex-shrink-0">
               <BackButton onClick={() => router.back()} />
               <div className="flex items-center gap-2">
@@ -228,7 +228,7 @@ export default function ReportTemplates() {
 
   return (
     <div className="w-full max-h-[97vh]">
-      <div className="bg-gray-900/10 py-6 px-8 w-full h-full flex flex-col rounded-xl border-t border-white/10">
+      <div className="bg-slate-50 py-6 px-8 w-full h-full flex flex-col rounded-xl border-t border-slate-200">
         {/* Top Toolbar */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 flex-shrink-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">

@@ -180,7 +180,7 @@ export const ReasoningContent = memo(
       )}
       {...props}
     >
-      <div className="pl-6 pr-2 py-2 border-l-2 border-white/10 ml-2">
+      <div className="pl-6 pr-2 py-2 border-l-2 border-border ml-2">
         <Response className="grid gap-2">{children}</Response>
       </div>
     </CollapsibleContent>

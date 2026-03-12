@@ -133,12 +133,12 @@ const ChatMessageItem = React.memo(({
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-red-400">Something went wrong</span>
             </div>
-            <p className="text-sm text-white/70">
+            <p className="text-sm text-foreground/70">
               An error occurred while processing your request. Please try again after some time.
             </p>
             <button
               onClick={() => onRetry(chatId)}
-              className="mt-2 text-xs text-white/50 hover:text-white/80 underline transition-colors"
+              className="mt-2 text-xs text-muted-foreground hover:text-foreground underline transition-colors"
             >
               Click here to retry
             </button>

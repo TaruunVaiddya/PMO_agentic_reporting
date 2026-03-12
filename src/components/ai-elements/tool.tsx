@@ -79,7 +79,7 @@ export const ToolHeader = ({
 
       <div className="flex items-center gap-2">
         <WrenchIcon className="size-4 text-muted-foreground" />
-        <span className="font-medium text-sm text-white/70">
+        <span className="font-medium text-sm text-foreground/70">
           {
             isLoading ? (
               <Shimmer>

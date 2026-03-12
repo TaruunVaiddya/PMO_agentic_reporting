@@ -12,7 +12,7 @@ export const useChatHandler = () => {
     const chatStore = useContext(ChatProviderContext);
     const { setPendingQuery, setNewSessionId } = useSession();
 
-    const handleStartChat = async (message: PromptInputMessage) => {
+    const handleStartChat = async (message: PromptInputMessage, customPathBase?: string) => {
         if (!chatStore) {
             console.error('Chat store not available');
             return;
@@ -52,7 +52,8 @@ export const useChatHandler = () => {
             setPendingQuery(text);
 
             // Navigate to the chat session page
-            router.push(`/chat/${sessionId}?chat=new`);
+            const pathBase = customPathBase || '/chat';
+            router.push(`${pathBase}/${sessionId}?chat=new`);
         } catch (error) {
             console.error('Failed to start chat:', error);
         }

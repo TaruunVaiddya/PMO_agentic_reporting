@@ -16,20 +16,19 @@ export function TemplateFilterPanel({ filterCategory, onFilterChange }: Template
   ]
 
   return (
-    <div className="mb-6 p-4 bg-card rounded-lg border border-white/10 flex-shrink-0">
+    <div className="mb-6 p-4 bg-white rounded-lg border border-slate-200 shadow-sm flex-shrink-0">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-white/60">Category:</span>
+          <span className="text-xs text-slate-500">Category:</span>
           <div className="flex items-center gap-1">
             {categoryOptions.map(option => (
               <button
                 key={option.value}
                 onClick={() => onFilterChange(option.value)}
-                className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
-                  filterCategory === option.value
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-black/10 text-white/60 hover:bg-black/20'
-                }`}
+                className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer border ${filterCategory === option.value
+                    ? 'bg-[#1a2456] text-white border-[#1a2456]'
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
+                  }`}
               >
                 {option.label}
               </button>
@@ -40,7 +39,7 @@ export function TemplateFilterPanel({ filterCategory, onFilterChange }: Template
         {filterCategory !== 'all' && (
           <button
             onClick={() => onFilterChange('all')}
-            className="ml-auto px-3 py-1 rounded text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors cursor-pointer"
+            className="ml-auto px-3 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 transition-colors cursor-pointer"
           >
             Clear Filters
           </button>

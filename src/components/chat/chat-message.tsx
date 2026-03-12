@@ -405,7 +405,7 @@ export const ChatMessage = React.memo(({
               {processedEvents ? processedEvents.textContent : message.content}
             </Response>
           ) : (
-            <div className="w-full">
+            <div className="w-full font-medium">
               {message.content}
             </div>
           )}
@@ -415,9 +415,9 @@ export const ChatMessage = React.memo(({
         {isAssistant && message.isStreaming && status !== 'Failed' && (
           <div className="flex items-center gap-1 mt-1 ml-2">
             <div className="flex gap-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-white via-white/70 to-white/40 animate-bounce shadow-[0_0_4px_rgba(255,255,255,0.4)]" style={{ animationDelay: '0ms' }} />
-              <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-white via-white/70 to-white/40 animate-bounce shadow-[0_0_4px_rgba(255,255,255,0.4)]" style={{ animationDelay: '150ms' }} />
-              <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-white via-white/70 to-white/40 animate-bounce shadow-[0_0_4px_rgba(255,255,255,0.4)]" style={{ animationDelay: '300ms' }} />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce shadow-[0_0_4px_rgba(var(--primary),0.4)]" style={{ animationDelay: '0ms' }} />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce shadow-[0_0_4px_rgba(var(--primary),0.4)]" style={{ animationDelay: '150ms' }} />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce shadow-[0_0_4px_rgba(var(--primary),0.4)]" style={{ animationDelay: '300ms' }} />
             </div>
           </div>
         )}
@@ -439,8 +439,8 @@ export const ChatMessage = React.memo(({
               />
             </svg>
             <div className="flex-1">
-              <p className="text-xs text-red-400 font-medium">Response generation failed</p>
-              <p className="text-xs text-white/60 mt-0.5">An error occurred. Please try again.</p>
+              <p className="text-xs text-red-500 font-bold uppercase tracking-tight">Response Failed</p>
+              <p className="text-xs text-muted-foreground mt-0.5">An error occurred while generating the response.</p>
             </div>
           </div>
         )}
@@ -522,13 +522,13 @@ const ToolCallBlock = React.memo(({ toolCall, onPreviewClick }: { toolCall: any;
 
   return (
     <div className="w-full max-w-full">
-      <Tool className="w-full border border-white/20 rounded-lg">
+      <Tool className="w-full border border-border rounded-lg bg-muted/20">
 
         <ToolHeader
           title={toolTitle}
           type={toolCall.name || 'tool'}
           state={toolCall.state}
-          className="text-white/85"
+          className="text-foreground/80 font-semibold"
         />
         <ToolContent>
           {/* Show input if available */}
@@ -537,7 +537,7 @@ const ToolCallBlock = React.memo(({ toolCall, onPreviewClick }: { toolCall: any;
               <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                 Parameters
               </h4>
-              <div className="rounded-md bg-muted/50 border border-white/10">
+              <div className="rounded-md bg-muted/50 border border-border">
                 <CodeBlock code={JSON.stringify(toolCall.input, null, 2)} language="json" />
               </div>
             </div>
@@ -765,15 +765,15 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate, 
   return (
     <div
       className={cn(
-        "w-full rounded-lg border border-white/20 bg-muted/10 p-4 transition-all duration-200 relative",
-        isCompleted && !isLoadingReport && "cursor-pointer hover:border-primary/50 hover:bg-muted/30",
+        "w-full rounded-lg border border-border bg-muted/20 p-4 transition-all duration-200 relative",
+        isCompleted && !isLoadingReport && "cursor-pointer hover:border-primary/50 hover:bg-muted/40",
         isLoadingReport && "opacity-75",
         isActive && "border-primary ring-1 ring-primary/50 bg-primary/5"
       )}
       onClick={handleFetchAndPreview}
     >
       {isActive && (
-        <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-in zoom-in duration-300">
+        <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-bold px-3 py-1 rounded-full shadow-md animate-in zoom-in duration-300">
           NOW VIEWING
         </div>
       )}
@@ -783,8 +783,8 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate, 
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
-            <h3 className="font-semibold text-white text-sm">{reportTitle}</h3>
-            <span className={cn("text-xs", statusInfo.color)}>{statusInfo.text}</span>
+            <h3 className="font-bold text-foreground text-sm uppercase tracking-tight">{reportTitle}</h3>
+            <span className={cn("text-[10px] font-bold uppercase", statusInfo.color)}>{statusInfo.text}</span>
           </div>
 
           {isStreaming && (
