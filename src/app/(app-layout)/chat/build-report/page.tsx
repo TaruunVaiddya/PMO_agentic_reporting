@@ -7,12 +7,10 @@ import { cn } from "@/lib/utils";
 import {
     WebPreview,
     WebPreviewBody,
-} from "@/components/ai-elements/web-preview-vercel";
-import {
     WebPreviewControls,
     PreviewMode,
     PageOrientation,
-} from "@/components/ai-elements/web-preview-controls";
+} from "@/components/report-viewer";
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
 import {
     SSEBuildReportHandler,

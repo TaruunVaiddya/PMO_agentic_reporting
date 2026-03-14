@@ -11,9 +11,11 @@ import {
 } from '@/components/ai-elements/conversation';
 import {
   WebPreview,
-  WebPreviewBody
-} from '@/components/ai-elements/web-preview-vercel';
-import { WebPreviewControls, PreviewMode, PageOrientation } from '@/components/ai-elements/web-preview-controls';
+  WebPreviewBody,
+  WebPreviewControls,
+  PreviewMode,
+  PageOrientation
+} from '@/components/report-viewer';
 import { useSidebar } from '@/contexts/sidebar-context';
 import { cn } from '@/lib/utils';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
@@ -37,34 +39,23 @@ const ANIMATION_DURATION = 300;
 // Utility function to extract HTML from markdown code blocks or result field
 // Moved outside component to prevent recreation on every render
 const extractHtmlContent = (output: any): string => {
-  let htmlContent = '';
-
-  // Handle report_id reference - should not happen here as it's fetched in ReportBlock
-  // But adding safety check for edge cases
-  if (output && typeof output === 'object' && 'report_id' in output) {
-    console.warn('Received report_id reference in extractHtmlContent. This should be fetched in ReportBlock.');
-    return '';
+  let html = "";
+  if (output && typeof output === "object") {
+    if (output.result) {
+      html = output.result;
+    } else if (output.html) {
+      html = output.html;
+    } else if (output.report_code && typeof output.report_code === "string") {
+      html = output.report_code;
+    } else if (output.report_code && typeof output.report_code.html === "string") {
+      html = output.report_code.html;
+    }
+  } else if (typeof output === "string") {
+    html = output;
   }
 
-  // Check if output has a result field
-  if (output && typeof output === 'object' && output.result) {
-    htmlContent = output.result;
-  } else if (typeof output === 'string') {
-    htmlContent = output;
-  } else {
-    return '';
-  }
-
-  // Strip markdown code fences if present
-  // Matches: ```html\n...content...\n``` or ```\n...content...\n```
-  const codeBlockRegex = /^```(?:html)?\n?([\s\S]*?)\n?```$/;
-  const match = htmlContent.trim().match(codeBlockRegex);
-
-  if (match && match[1]) {
-    return match[1].trim();
-  }
-
-  return htmlContent.trim();
+  const match = html.trim().match(/^```(?:html)?\n?([\s\S]*?)\n?```$/);
+  return match ? match[1].trim() : html.trim();
 };
 
 export default function Page({ params }: ChatSessionPageProps) {
