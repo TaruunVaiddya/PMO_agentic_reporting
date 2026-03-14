@@ -71,10 +71,10 @@ export function TemplatePreviewModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-none w-[95vw] sm:w-[85vw] md:w-[80vw] lg:w-[70vw] xl:w-[65vw] h-[90vh] sm:h-[80vh] p-0 overflow-hidden border border-white/30 shadow-2xl bg-gradient-to-br from-black/95 to-neutral-950/95 backdrop-blur-xl rounded-2xl flex flex-col sm:flex-row [&>button:last-child]:hidden">
+            <DialogContent className="max-w-none w-[95vw] sm:w-[85vw] md:w-[80vw] lg:w-[70vw] xl:w-[65vw] h-[90vh] sm:h-[80vh] p-0 overflow-hidden border border-slate-200 shadow-2xl bg-white rounded-2xl flex flex-col sm:flex-row [&>button:last-child]:hidden">
                 {/* Left Side: Zoomable Preview */}
                 <div
-                    className="flex-1 relative min-h-[40vh] sm:min-h-0 border-b sm:border-b-0 sm:border-r border-white/20 bg-black/40 overflow-hidden select-none"
+                    className="flex-1 relative min-h-[40vh] sm:min-h-0 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 overflow-hidden select-none"
                     onWheel={handleWheel}
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
@@ -100,20 +100,20 @@ export function TemplatePreviewModal({
                     <div className="absolute inset-0 bg-gradient-to-tr from-black/20 via-transparent to-white/5 pointer-events-none" />
 
                     {/* Zoom Controls */}
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-2 py-1.5 rounded-lg bg-black/70 border border-white/15 backdrop-blur-sm">
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-2 py-1.5 rounded-lg bg-white/90 border border-slate-200 backdrop-blur-md shadow-sm">
                         <button
                             onClick={handleZoomOut}
-                            className="p-1.5 rounded hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                            className="p-1.5 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors"
                             title="Zoom out"
                         >
                             <ZoomOut className="w-3.5 h-3.5" />
                         </button>
-                        <span className="text-[11px] text-white/50 font-mono w-10 text-center tabular-nums">
+                        <span className="text-[11px] text-slate-600 font-mono w-10 text-center tabular-nums">
                             {zoomPercent}%
                         </span>
                         <button
                             onClick={handleZoomIn}
-                            className="p-1.5 rounded hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                            className="p-1.5 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors"
                             title="Zoom in"
                         >
                             <ZoomIn className="w-3.5 h-3.5" />
@@ -121,7 +121,7 @@ export function TemplatePreviewModal({
                         {zoom !== 1 && (
                             <button
                                 onClick={handleReset}
-                                className="p-1.5 rounded hover:bg-white/10 text-white/50 hover:text-white transition-colors ml-0.5 border-l border-white/10 pl-1.5"
+                                className="p-1.5 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors ml-0.5 border-l border-slate-200 pl-1.5"
                                 title="Reset zoom"
                             >
                                 <RotateCcw className="w-3.5 h-3.5" />
@@ -135,31 +135,31 @@ export function TemplatePreviewModal({
                     <div className="p-6 sm:p-8 flex-1 flex flex-col overflow-y-auto custom-scrollbar">
                         <DialogHeader className="mb-8 text-left relative">
                             <div className="flex items-center justify-between mb-4">
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/10 text-white border border-white/20 uppercase tracking-[0.2em]">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 uppercase tracking-[0.2em]">
                                     Template
                                 </span>
-                                <DialogClose className="p-1.5 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all duration-200">
+                                <DialogClose className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-all duration-200">
                                     <X className="w-4 h-4" />
                                 </DialogClose>
                             </div>
-                            <DialogTitle className="text-xl sm:text-2xl font-semibold text-white tracking-tight leading-tight">
+                            <DialogTitle className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight leading-tight">
                                 {template.name}
                             </DialogTitle>
                         </DialogHeader>
 
                         <div className="flex-1 space-y-8">
                             <div className="space-y-3">
-                                <h4 className="text-[10px] font-bold text-white/60 uppercase tracking-[0.2em]">Description</h4>
-                                <p className="text-sm text-white leading-relaxed font-light">
+                                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Description</h4>
+                                <p className="text-sm text-slate-600 leading-relaxed font-light">
                                     {template.description || "A professional report template designed for clarity and impact."}
                                 </p>
                             </div>
 
-                            <div className="space-y-6 pt-6 border-t border-white/10">
+                            <div className="space-y-6 pt-6 border-t border-slate-200">
                                 {template.createdAt && (
                                     <div className="space-y-1.5">
-                                        <h4 className="text-[10px] font-bold text-white/60 uppercase tracking-[0.2em]">Release Date</h4>
-                                        <p className="text-sm text-white/95 font-medium">
+                                        <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Release Date</h4>
+                                        <p className="text-sm text-slate-900 font-medium">
                                             {new Date(template.createdAt).toLocaleDateString(undefined, {
                                                 year: 'numeric',
                                                 month: 'short',
@@ -171,10 +171,10 @@ export function TemplatePreviewModal({
 
                                 {template.status && (
                                     <div className="space-y-1.5">
-                                        <h4 className="text-[10px] font-bold text-white/60 uppercase tracking-[0.2em]">Status</h4>
+                                        <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</h4>
                                         <div className="flex items-center gap-2">
-                                            <div className={`w-2 h-2 rounded-sm ${template.status === 'completed' ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'bg-white/30'}`} />
-                                            <span className="text-sm text-white/95 capitalize font-medium">{template.status}</span>
+                                            <div className={`w-2 h-2 rounded-sm ${template.status === 'completed' ? 'bg-[#1a2456] shadow-sm' : 'bg-slate-300'}`} />
+                                            <span className="text-sm text-slate-900 capitalize font-medium">{template.status}</span>
                                         </div>
                                     </div>
                                 )}
@@ -182,12 +182,12 @@ export function TemplatePreviewModal({
                         </div>
                     </div>
 
-                    <div className="p-6 sm:p-8 border-t border-white/20 bg-black/40 backdrop-blur-md">
+                    <div className="p-6 sm:p-8 border-t border-slate-200 bg-slate-50">
                         <div className="relative group">
                             <button
                                 onClick={handleUse}
                                 disabled={isStarting}
-                                className="w-full relative px-6 py-4 text-sm bg-black/20 hover:bg-black/10 disabled:bg-black/40 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg border border-white/30 transition-all duration-300 cursor-pointer overflow-hidden shadow-lg"
+                                className="w-full relative px-6 py-4 text-sm bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all duration-300 cursor-pointer overflow-hidden shadow-lg"
                             >
                                 <div
                                     className="absolute inset-0 z-0 pointer-events-none opacity-40 group-hover:opacity-100 transition-opacity duration-500"

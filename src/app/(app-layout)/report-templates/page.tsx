@@ -147,10 +147,10 @@ export default function ReportTemplates() {
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-5 pb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-5 pb-6">
               {[...Array(12)].map((_, i) => (
                 <div key={i} className="border border-slate-200 rounded-xl overflow-hidden bg-white">
-                  <div className="w-full aspect-[4/5] bg-slate-100 animate-pulse" />
+                  <div className="w-full aspect-[3/2] bg-slate-100 animate-pulse" />
                   <div className="p-3">
                     <div className="h-4 bg-slate-100 rounded animate-pulse w-3/4 mx-auto" />
                   </div>
@@ -246,10 +246,6 @@ export default function ReportTemplates() {
           </div>
 
           <div className="flex items-center gap-2">
-            <MetallicButton onClick={() => router.push('/chat')}>
-              <Sparkles className="w-4 h-4" />
-              <span>Generate Template</span>
-            </MetallicButton>
             <MetallicButton onClick={() => setShowUploadModal(true)}>
               <Upload className="w-4 h-4" />
               <span>Upload Template</span>

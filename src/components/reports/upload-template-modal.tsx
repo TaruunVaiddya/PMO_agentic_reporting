@@ -95,7 +95,7 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
 
   const handleClose = () => {
     if (isSubmitting) return
-    setName('')
+    setName('') 
     setDescription('')
     setImageFile(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -106,7 +106,7 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
     <AnimatePresence>
       {open && (
         <Dialog open={open} onOpenChange={(v) => { if (!isSubmitting) onOpenChange(v) }}>
-          <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border border-white/30 shadow-2xl bg-gradient-to-br from-black/95 to-neutral-950/95 backdrop-blur-xl">
+          <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border border-slate-200 shadow-2xl bg-white">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -116,10 +116,10 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
             >
               <div className="p-6">
                 <DialogHeader className="mb-6">
-                  <DialogTitle className="text-xl font-semibold text-white">
+                  <DialogTitle className="text-xl font-semibold text-slate-900">
                     Upload Template
                   </DialogTitle>
-                  <p className="text-sm text-neutral-400 mt-1">
+                  <p className="text-sm text-slate-500 mt-1">
                     Add a new report template from an image
                   </p>
                 </DialogHeader>
@@ -135,20 +135,20 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
                       className="py-12 flex flex-col items-center gap-6 text-center"
                     >
                       <div className="relative">
-                        <div className="w-16 h-16 rounded-full border border-white/10 bg-white/5 flex items-center justify-center">
-                          <Loader2 className="w-7 h-7 text-white/60 animate-spin" />
+                        <div className="w-16 h-16 rounded-full border border-slate-100 bg-slate-50 flex items-center justify-center">
+                          <Loader2 className="w-7 h-7 text-slate-400 animate-spin" />
                         </div>
-                        <div className="absolute inset-0 rounded-full bg-white/5 animate-ping opacity-30" />
+                        <div className="absolute inset-0 rounded-full bg-slate-100 animate-ping opacity-30" />
                       </div>
                       <div className="space-y-2">
-                        <p className="text-base font-medium text-white">Processing your template…</p>
-                        <p className="text-sm text-white/40 max-w-[280px]">
+                        <p className="text-base font-medium text-slate-900">Processing your template…</p>
+                        <p className="text-sm text-slate-500 max-w-[280px]">
                           We're analysing the image and setting up your template. This may take a moment.
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10">
-                        <Clock className="w-3.5 h-3.5 text-white/30" />
-                        <span className="text-xs text-white/40">Please don't close this window</span>
+                      <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-50 border border-slate-100">
+                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="text-xs text-slate-500">Please don't close this window</span>
                       </div>
                     </motion.div>
                   ) : (
@@ -163,8 +163,8 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
                     >
                       {/* Name */}
                       <div>
-                        <label className="block text-sm font-medium text-white/80 mb-2">
-                          Template Name <span className="text-red-400">*</span>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Template Name <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -173,27 +173,27 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
                           placeholder="e.g., Q4 Financial Report"
                           autoFocus
                           maxLength={100}
-                          className="w-full p-3 bg-black/20 border border-white/20 focus:border-white/40 rounded-lg text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-white/30"
+                          className="w-full p-3 bg-slate-50 border border-slate-200 focus:border-slate-400 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                         />
                       </div>
 
                       {/* Image Upload */}
                       <div>
-                        <label className="block text-sm font-medium text-white/80 mb-2">
-                          Template Image <span className="text-red-400">*</span>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Template Image <span className="text-red-500">*</span>
                         </label>
                         <div
                           onDrop={handleDrop}
                           onDragOver={(e) => e.preventDefault()}
                           onClick={() => fileInputRef.current?.click()}
                           className={`w-full border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center gap-3 transition-colors cursor-pointer
-                            ${imageFile ? 'border-white/30 bg-white/5' : 'border-white/15 hover:border-white/30 hover:bg-white/5'}`}
+                            ${imageFile ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
                         >
                           {imageFile ? (
                             <>
-                              <ImageIcon className="w-6 h-6 text-white/60" />
+                              <ImageIcon className="w-6 h-6 text-slate-500" />
                               <div className="flex items-center gap-2">
-                                <span className="text-sm text-white/80 truncate max-w-[280px]">{imageFile.name}</span>
+                                <span className="text-sm text-slate-700 truncate max-w-[280px]">{imageFile.name}</span>
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -201,23 +201,23 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
                                     setImageFile(null)
                                     if (fileInputRef.current) fileInputRef.current.value = ''
                                   }}
-                                  className="text-white/40 hover:text-white/70 transition-colors"
+                                  className="text-slate-400 hover:text-slate-600 transition-colors"
                                 >
                                   <X className="w-4 h-4" />
                                 </button>
                               </div>
-                              <span className="text-xs text-white/40">
+                              <span className="text-xs text-slate-400">
                                 {(imageFile.size / 1024).toFixed(1)} KB
                               </span>
                             </>
                           ) : (
                             <>
-                              <Upload className="w-6 h-6 text-white/40" />
-                              <span className="text-sm text-white/60">Drop an image here or click to browse</span>
-                              <span className="text-xs text-white/30">PNG, JPG, WebP, GIF supported</span>
-                              <div className="flex items-center gap-1.5 mt-1 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
-                                <Clock className="w-3 h-3 text-amber-400/70" />
-                                <span className="text-[11px] text-white/40">
+                              <Upload className="w-6 h-6 text-slate-400" />
+                              <span className="text-sm text-slate-500">Drop an image here or click to browse</span>
+                              <span className="text-xs text-slate-400">PNG, JPG, WebP, GIF supported</span>
+                              <div className="flex items-center gap-1.5 mt-1 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200">
+                                <Clock className="w-3 h-3 text-amber-500" />
+                                <span className="text-[11px] text-slate-500">
                                   Currently only images are allowed — document uploads coming soon
                                 </span>
                               </div>
@@ -235,8 +235,8 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
 
                       {/* Description */}
                       <div>
-                        <label className="block text-sm font-medium text-white/80 mb-2">
-                          Description <span className="text-white/40 text-xs">(Optional)</span>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Description <span className="text-slate-400 text-xs">(Optional)</span>
                         </label>
                         <textarea
                           value={description}
@@ -244,7 +244,7 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
                           placeholder="Brief description of this template…"
                           rows={2}
                           maxLength={500}
-                          className="w-full p-3 bg-black/20 border border-white/20 focus:border-white/40 rounded-lg text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 resize-none"
+                          className="w-full p-3 bg-slate-50 border border-slate-200 focus:border-slate-400 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300 resize-none"
                         />
                       </div>
 
@@ -253,7 +253,7 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
                         <button
                           type="button"
                           onClick={handleClose}
-                          className="px-4 py-2 text-sm text-white/60 hover:text-white/90 transition-colors cursor-pointer"
+                          className="px-4 py-2 text-sm text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
                         >
                           Cancel
                         </button>
@@ -261,12 +261,12 @@ export function UploadTemplateModal({ open, onOpenChange, onSuccess }: UploadTem
                           <button
                             type="submit"
                             disabled={!name.trim() || !imageFile}
-                            className="relative px-4 py-2 text-sm bg-black/20 hover:bg-black/10 disabled:bg-black/40 disabled:opacity-50 disabled:cursor-not-allowed text-white/90 rounded-lg border border-white/30 transition-all duration-300 cursor-pointer overflow-hidden"
+                            className="relative px-4 py-2 text-sm bg-slate-900 hover:bg-slate-800 disabled:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg border border-slate-200 transition-all duration-300 cursor-pointer overflow-hidden"
                           >
                             <div
-                              className="absolute inset-0 z-0 pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity duration-300"
+                              className="absolute inset-0 z-0 pointer-events-none opacity-10 group-hover:opacity-20 transition-opacity duration-300"
                               style={{
-                                background: "radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 50%, transparent 100%)"
+                                background: "radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 70%)"
                               }}
                             />
                             <span className="relative z-10 flex items-center gap-2">

@@ -31,7 +31,7 @@ export function ReportCard({ report, onClick, onUseTemplate, onDelete }: ReportC
       {/* Card structure */}
       <div className="relative z-10 flex flex-col h-full">
         {/* Image thumbnail */}
-        <div className="relative w-full xl:aspect-[4/5] aspect-square overflow-hidden bg-slate-50 p-2">
+        <div className="relative w-full aspect-[3/2] overflow-hidden bg-slate-50 p-2">
           <div className="relative w-full h-full rounded-lg overflow-hidden border border-slate-100 bg-white">
             <img
               src={report.thumbnail}

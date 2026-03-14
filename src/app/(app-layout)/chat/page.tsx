@@ -16,8 +16,9 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { ReportSessionsModal } from '@/components/reports/report-sessions-modal'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+
 
 interface Template {
   id: string
@@ -50,6 +51,7 @@ export default function ChatWizardPage() {
   const router = useRouter()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [sessionsModalOpen, setSessionsModalOpen] = useState(false)
 
   const [templates, setTemplates] = useState<Template[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(true)
@@ -196,7 +198,7 @@ export default function ChatWizardPage() {
       selected_template_ids: Array.from(selectedTemplateIds),
       portfolio_id,
       program_ids: program_ids.length > 0 ? program_ids : null,
-      project_ids: project_ids.length > 0 ? project_ids : null,
+      project_ids: project_ids.length > 0 ? project_ids : null
     }
 
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
@@ -221,14 +223,25 @@ export default function ChatWizardPage() {
             </button>
             <h1 className="text-sm font-semibold text-slate-800">Create Report Pack</h1>
           </div>
-          <Button
-            onClick={handleSave}
-            disabled={!canSave}
-            className="bg-[#4c35c9] hover:bg-[#3d28b0] disabled:opacity-40 text-white px-5 h-8 rounded text-xs font-semibold shadow-none"
-          >
-            Build Report
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setSessionsModalOpen(true)}
+              className="border-[#4c35c9] text-[#4c35c9] hover:bg-[#4c35c9]/5 px-5 rounded text-xs font-semibold shadow-none h-8"
+            >
+              View Generated Reports
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={!canSave}
+              className="bg-[#4c35c9] hover:bg-[#3d28b0] disabled:opacity-60 text-white px-5 rounded text-xs font-semibold shadow-none h-8"
+            >
+              Build Report
+            </Button>
+          </div>
         </div>
+
+        <ReportSessionsModal open={sessionsModalOpen} onOpenChange={setSessionsModalOpen} />
 
         {/* ── Title + Description ── */}
         <div className="grid grid-cols-2 gap-4 mb-4">

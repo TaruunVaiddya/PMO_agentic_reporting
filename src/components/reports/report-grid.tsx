@@ -13,7 +13,7 @@ export function ReportGrid({ reports, onReportClick, onUseTemplate, onDelete, co
     columns === 3 ? 'grid-cols-2 md:grid-cols-3' :
       columns === 4 ? 'grid-cols-2 md:grid-cols-4' :
         columns === 5 ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5' :
-          'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8';
+          'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6';
 
   return (
     <div className={`grid ${gridClass} gap-5`}>

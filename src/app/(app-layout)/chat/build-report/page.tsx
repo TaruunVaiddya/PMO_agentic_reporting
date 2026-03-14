@@ -44,6 +44,7 @@ import {
     X,
 } from "lucide-react";
 import { EditPanel } from "@/components/editor/edit-panel";
+import { fetcher } from "@/lib/get-fetcher";
 
 // ─── Storage Key ──────────────────────────────────────────────────────────────
 const STORAGE_KEY = "buildReportRequest";
@@ -62,8 +63,14 @@ interface BuiltReport extends ReportEvent {
 // ─── Utility ────────────────────────────────────────────────────────────────
 const extractHtmlContent = (output: any): string => {
     let html = "";
-    if (output && typeof output === "object" && output.result) {
-        html = output.result;
+    if (output && typeof output === "object") {
+        if (output.result) {
+            html = output.result;
+        } else if (output.html) {
+            html = output.html;
+        } else if (output.report_code && typeof output.report_code === "string") {
+            html = output.report_code;
+        }
     } else if (typeof output === "string") {
         html = output;
     }
@@ -311,7 +318,7 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
             return;
         }
 
-        let req: BuildReportRequest;
+        let req: BuildReportRequest & { mode?: 'view', report_name?: string };
         try {
             req = JSON.parse(raw);
         } catch {
@@ -319,9 +326,36 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
             return;
         }
 
+        if (req.mode === 'view') {
+            setTemplateNames([req.report_name || "Existing Report"]);
+            setStatuses([{ step: "Loading existing report...", state: "started" }]);
+
+            fetcher(`/report/${req.session_id}`)
+                .then(res => {
+                    const htmlContent = extractHtmlContent(res.report_code || res);
+                    setReports([{
+                        id: req.session_id,
+                        template_id: 'existing',
+                        template_name: req.report_name || "Existing Report",
+                        state: "output-available",
+                        output: htmlContent,
+                        htmlContent
+                    }]);
+                    setStatuses([{ step: "Report loaded successfully", state: "completed" }]);
+                    setPhase("done");
+                    collapse();
+                })
+                .catch(err => {
+                    console.error("Failed to fetch report:", err);
+                    setErrors([{ error: "Failed to load report from server.", code: "FETCH_ERROR" }]);
+                    setPhase("failed");
+                });
+            return;
+        }
+
         setTemplateNames(req.selected_template_ids);
 
-        const handler = new SSEBuildReportHandler(req, {
+        const handler = new SSEBuildReportHandler(req as BuildReportRequest, {
             onStatus: (ev) => {
                 setStatuses((prev) => {
                     // Update existing entry for same step+template or append
@@ -483,18 +517,19 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
         </div>
     );
 
-    // ── Edit panel (left of report, replaces chat) ───────────────────────────
-    const leftPanelEdit = (
+    // ── Right panel: EditPanel in edit mode, Chat panel otherwise ────────────
+    const rightPanelContent = previewMode === "edit" ? (
         <EditPanel
             selectedElement={selectedElement}
             onUpdate={handlePropertyUpdate}
             onReset={handleResetElement}
             onClose={handleCloseEditPanel}
         />
-    );
+    ) : chatPanelContent;
 
-    // Decide if chat is "showing" (for animation)
+    // Right panel is visible when: edit mode is active OR chat is open/closing
     const chatVisible = chatOpen || isClosingChat;
+    const rightPanelVisible = previewMode === "edit" || chatVisible;
 
     // ── Render ───────────────────────────────────────────────────────────────
     if (phase === "loading" || (phase === "failed" && reports.length === 0)) {
@@ -512,72 +547,47 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
     return (
         <div className="flex h-full overflow-hidden relative">
 
-            {/* ── Main area: edit panel (if edit mode active) + report ─────────── */}
-            {previewMode === "edit" && chatVisible ? (
-                // Edit mode with chat open: [Edit][Report][Chat]
-                <PanelGroup direction="horizontal" className="h-full w-full">
-                    <Panel defaultSize={20} minSize={15} maxSize={35} className="flex flex-col">
-                        {leftPanelEdit}
-                    </Panel>
-                    <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize" />
-                    <Panel defaultSize={55} minSize={30} className="flex flex-col">
-                        {reportPanel}
-                    </Panel>
-                    <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize" />
-                    <Panel defaultSize={25} minSize={20} maxSize={50} className="flex flex-col">
-                        <div className={cn("h-full transition-all duration-300", isClosingChat && "translate-x-full opacity-0")}>
-                            {chatPanelContent}
-                        </div>
-                    </Panel>
-                </PanelGroup>
-            ) : previewMode === "edit" ? (
-                // Edit mode without chat: [Edit][Report]
-                <PanelGroup direction="horizontal" className="h-full w-full">
-                    <Panel defaultSize={25} minSize={15} maxSize={40} className="flex flex-col">
-                        {leftPanelEdit}
-                    </Panel>
-                    <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize" />
-                    <Panel defaultSize={75} minSize={40} className="flex flex-col">
-                        {reportPanel}
-                    </Panel>
-                </PanelGroup>
-            ) : useResizablePanels && chatVisible ? (
-                // View mode, chat open, resizable panels
+            {/* ── [Report left] | [EditPanel or Chat right] ───────────────────── */}
+            {useResizablePanels && rightPanelVisible ? (
+                // Resizable panels once animation settles
                 <PanelGroup direction="horizontal" className="h-full w-full">
                     <Panel defaultSize={70} minSize={40} maxSize={85} className="flex flex-col">
                         {reportPanel}
                     </Panel>
                     <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize" />
                     <Panel defaultSize={30} minSize={20} maxSize={50} className="flex flex-col">
-                        {chatPanelContent}
+                        {rightPanelContent}
                     </Panel>
                 </PanelGroup>
             ) : (
-                // View mode, no resizable panels yet (animation or chat closed)
+                // CSS transition layout (initial open/close animation)
                 <>
                     <div
                         className={cn(
                             "flex flex-col transition-all duration-300 ease-in-out",
-                            chatVisible ? "w-[70%]" : "w-full"
+                            rightPanelVisible ? "w-[70%]" : "w-full"
                         )}
                     >
                         {reportPanel}
                     </div>
-                    {chatVisible && (
+                    {rightPanelVisible && (
                         <div
                             className={cn(
                                 "w-[30%] transition-all duration-300 ease-in-out",
-                                isClosingChat ? "translate-x-full opacity-0" : "translate-x-0 opacity-100"
+                                // Slide-out animation only when chat is closing (not edit mode toggle)
+                                isClosingChat && previewMode !== "edit"
+                                    ? "translate-x-full opacity-0"
+                                    : "translate-x-0 opacity-100"
                             )}
                         >
-                            {chatPanelContent}
+                            {rightPanelContent}
                         </div>
                     )}
                 </>
             )}
 
-            {/* ── Floating chat button ────────────────────────────────────────── */}
-            {!chatOpen && phase === "done" && (
+            {/* ── Floating chat button (only in view mode, chat closed) ────────── */}
+            {!chatOpen && previewMode === "view" && phase === "done" && (
                 <button
                     onClick={handleOpenChat}
                     title="Open Chat Assistant"
