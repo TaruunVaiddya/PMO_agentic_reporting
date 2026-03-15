@@ -55,7 +55,7 @@ export function ReportSessionsModal({ open, onOpenChange }: ReportSessionsModalP
             <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col p-0 bg-white border-none shadow-2xl">
                 <DialogHeader className="px-6 py-4 border-b border-slate-100 shrink-0">
                     <DialogTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                        <FileText className="w-5 h-5 text-[#4c35c9]" />
+                        <FileText className="w-5 h-5 text-[#1a2456]" />
                         Generated Report Sessions
                     </DialogTitle>
                 </DialogHeader>
@@ -63,7 +63,7 @@ export function ReportSessionsModal({ open, onOpenChange }: ReportSessionsModalP
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 gap-3">
-                            <Loader2 className="w-8 h-8 animate-spin text-[#4c35c9]" />
+                            <Loader2 className="w-8 h-8 animate-spin text-[#1a2456]" />
                             <p className="text-sm text-slate-500">Fetching your sessions...</p>
                         </div>
                     ) : sessions.length === 0 ? (
@@ -86,11 +86,11 @@ export function ReportSessionsModal({ open, onOpenChange }: ReportSessionsModalP
                                         className="grid grid-cols-12 gap-4 items-center px-4 py-3.5 hover:bg-slate-50/80 transition-colors group cursor-pointer rounded-lg"
                                     >
                                         <div className="col-span-8 flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-[#4c35c9]/5 flex items-center justify-center text-[#4c35c9] group-hover:bg-[#4c35c9] group-hover:text-white transition-colors">
+                                            <div className="w-8 h-8 rounded-lg bg-[#1a2456]/5 flex items-center justify-center text-[#1a2456] group-hover:bg-[#1a2456] group-hover:text-white transition-colors">
                                                 <FileText className="w-4 h-4" />
                                             </div>
                                             <div className="flex flex-col gap-0.5 overflow-hidden">
-                                                <span className="text-sm font-semibold text-slate-700 truncate group-hover:text-[#4c35c9] transition-colors">
+                                                <span className="text-sm font-semibold text-slate-700 truncate group-hover:text-[#1a2456] transition-colors">
                                                     {session.title || "Untitled Session"}
                                                 </span>
                                                 <span className="text-[10px] text-slate-400 font-mono truncate uppercase tracking-tight">
@@ -105,7 +105,7 @@ export function ReportSessionsModal({ open, onOpenChange }: ReportSessionsModalP
                                             </span>
                                         </div>
                                         <div className="col-span-1 flex justify-end">
-                                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#4c35c9] transition-colors" />
+                                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#1a2456] transition-colors" />
                                         </div>
                                     </div>
                                 ))}

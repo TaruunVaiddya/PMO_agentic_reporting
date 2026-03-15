@@ -227,14 +227,14 @@ export default function ChatWizardPage() {
             <Button
               variant="outline"
               onClick={() => setSessionsModalOpen(true)}
-              className="border-[#4c35c9] text-[#4c35c9] hover:bg-[#4c35c9]/5 px-5 rounded text-xs font-semibold shadow-none h-8"
+              className="border-[#1a2456] text-[#1a2456] hover:bg-[#273681]/5 px-5 rounded text-xs font-semibold shadow-none h-8"
             >
               View Generated Reports
             </Button>
             <Button
               onClick={handleSave}
               disabled={!canSave}
-              className="bg-[#4c35c9] hover:bg-[#3d28b0] disabled:opacity-60 text-white px-5 rounded text-xs font-semibold shadow-none h-8"
+              className="bg-[#1a2456] hover:bg-[#273681] disabled:opacity-60 text-white px-5 rounded text-xs font-semibold shadow-none h-8"
             >
               Build Report
             </Button>
@@ -253,7 +253,7 @@ export default function ChatWizardPage() {
               placeholder="Enter Title"
               value={title}
               onChange={e => setTitle(e.target.value)}
-              className="bg-white border-slate-300 rounded h-8 text-xs placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-[#4c35c9] focus-visible:border-[#4c35c9]"
+              className="bg-white border-slate-300 rounded h-8 text-xs placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-[#1a2456] focus-visible:border-[#1a2456]"
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -262,7 +262,7 @@ export default function ChatWizardPage() {
               placeholder="Enter Portfolio Dossier Description"
               value={description}
               onChange={e => setDescription(e.target.value)}
-              className="bg-white border-slate-300 rounded text-xs resize-none placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-[#4c35c9] focus-visible:border-[#4c35c9]"
+              className="bg-white border-slate-300 rounded text-xs resize-none placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-[#1a2456] focus-visible:border-[#1a2456]"
               rows={2}
               maxLength={3000}
             />
@@ -291,7 +291,7 @@ export default function ChatWizardPage() {
                   <Checkbox
                     checked={selectedTemplateIds.has(template.id)}
                     onCheckedChange={() => toggleTemplate(template.id)}
-                    className="h-3 w-3 rounded-sm border-slate-400 data-[state=checked]:bg-[#4c35c9] data-[state=checked]:border-[#4c35c9]"
+                    className="h-3 w-3 rounded-sm border-slate-400 data-[state=checked]:bg-[#1a2456] data-[state=checked]:border-[#1a2456]"
                   />
                   <span className="text-[11px] text-slate-700 capitalize">{template.name}</span>
                 </label>
@@ -330,14 +330,14 @@ export default function ChatWizardPage() {
                   <div className="flex items-center gap-3">
                     <button
                       onClick={selectAll}
-                      className="text-[11px] text-[#4c35c9] hover:underline font-semibold"
+                      className="text-[11px] text-[#1a2456] hover:underline font-semibold"
                     >
                       Select All
                     </button>
                     <button className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-2 py-1 bg-white">
                       <SlidersHorizontal size={10} />
                       FILTERS
-                      <span className="inline-flex items-center justify-center bg-[#4c35c9] text-white rounded-full w-3.5 h-3.5 text-[9px] font-bold ml-0.5">2</span>
+                      <span className="inline-flex items-center justify-center bg-[#1a2456] text-white rounded-full w-3.5 h-3.5 text-[9px] font-bold ml-0.5">2</span>
                     </button>
                     <button
                       onClick={() => setExpandedPortfolios(new Set(portfolios.map(p => p.portfolio_id)))}
@@ -366,7 +366,7 @@ export default function ChatWizardPage() {
                             <Checkbox
                               checked={isChecked}
                               onCheckedChange={() => handlePortfolioToggle(portfolio)}
-                              className="h-3 w-3 rounded-sm border-slate-400 data-[state=checked]:bg-[#4c35c9] data-[state=checked]:border-[#4c35c9]"
+                              className="h-3 w-3 rounded-sm border-slate-400 data-[state=checked]:bg-[#1a2456] data-[state=checked]:border-[#1a2456]"
                             />
                           </div>
                           <button
@@ -392,7 +392,7 @@ export default function ChatWizardPage() {
                                     <Checkbox
                                       checked={programChecked}
                                       onCheckedChange={() => handleProgramToggle(program, portfolio)}
-                                      className="h-3 w-3 rounded-sm border-slate-400 data-[state=checked]:bg-[#4c35c9] data-[state=checked]:border-[#4c35c9]"
+                                      className="h-3 w-3 rounded-sm border-slate-400 data-[state=checked]:bg-[#1a2456] data-[state=checked]:border-[#1a2456]"
                                     />
                                     <span className="text-[11px] font-semibold text-slate-700">
                                       Program: {program.program_name}
@@ -407,7 +407,7 @@ export default function ChatWizardPage() {
                                           <Checkbox
                                             checked={selectedProjects.has(project.project_id)}
                                             onCheckedChange={() => handleProjectToggle(project.project_id, portfolio)}
-                                            className="h-3 w-3 rounded-sm border-slate-400 data-[state=checked]:bg-[#4c35c9] data-[state=checked]:border-[#4c35c9]"
+                                            className="h-3 w-3 rounded-sm border-slate-400 data-[state=checked]:bg-[#1a2456] data-[state=checked]:border-[#1a2456]"
                                           />
                                           <span className="text-[11px] text-slate-600">{project.project_name}</span>
                                         </label>
@@ -437,7 +437,7 @@ export default function ChatWizardPage() {
                         <Checkbox
                           checked={selectedProjects.has(project.project_id)}
                           onCheckedChange={() => handleProjectToggle(project.project_id, project.portfolio)}
-                          className="h-3 w-3 rounded-sm border-slate-400 data-[state=checked]:bg-[#4c35c9] data-[state=checked]:border-[#4c35c9]"
+                          className="h-3 w-3 rounded-sm border-slate-400 data-[state=checked]:bg-[#1a2456] data-[state=checked]:border-[#1a2456]"
                         />
                         <span className="text-[11px] text-slate-600">{project.project_name}</span>
                         <span className="text-[10px] text-slate-400">({project.portfolio.portfolio_name})</span>
