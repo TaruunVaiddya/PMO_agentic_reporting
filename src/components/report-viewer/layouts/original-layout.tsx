@@ -10,6 +10,7 @@ export interface ReportLayoutProps {
     htmlContent?: string;
     className?: string;
     onIframeRef?: (iframe: HTMLIFrameElement | null) => void;
+    streamingStatusText?: string;
     // Specific to paginated layouts:
     editMode?: boolean;
     onEditModeReady?: (iframe: HTMLIFrameElement) => void;

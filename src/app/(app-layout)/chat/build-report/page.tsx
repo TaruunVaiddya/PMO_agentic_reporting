@@ -85,6 +85,52 @@ const extractHtmlContent = (output: any): string => {
     return match ? match[1].trim() : html.trim();
 };
 
+// ─── Streaming status (typewriter) ─────────────────────────────────────────
+function useStreamingStatusText(statuses: StatusItem[]) {
+    const [queue, setQueue] = useState<string[]>([]);
+    const [displayText, setDisplayText] = useState("");
+    const isTypingRef = useRef(false);
+    const lastQueuedRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (statuses.length === 0) return;
+        const latest = statuses[statuses.length - 1];
+        const message =
+            latest.step + (latest.state === "retrying" ? " (retrying...)" : "");
+        if (lastQueuedRef.current === message) return;
+        lastQueuedRef.current = message;
+        setQueue((prev) => [...prev, message]);
+    }, [statuses]);
+
+    useEffect(() => {
+        if (isTypingRef.current || queue.length === 0) return;
+        const message = queue[0];
+        let index = 0;
+        let cancelled = false;
+        isTypingRef.current = true;
+
+        const tick = () => {
+            if (cancelled) return;
+            index += 1;
+            setDisplayText(message.slice(0, index));
+            if (index < message.length) {
+                window.setTimeout(tick, 18);
+            } else {
+                isTypingRef.current = false;
+                setQueue((prev) => prev.slice(1));
+            }
+        };
+
+        const timer = window.setTimeout(tick, 18);
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+        };
+    }, [queue]);
+
+    return displayText || "Formatting report...";
+}
+
 // ─── Loading Screen ──────────────────────────────────────────────────────────
 function BuildLoadingScreen({
     statuses,
@@ -215,11 +261,13 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
     const [reports, setReports] = useState<BuiltReport[]>([]);
     const [activeReportIndex, setActiveReportIndex] = useState(0);
     const [templateNames, setTemplateNames] = useState<string[]>([]);
+    const [isStreamClosed, setIsStreamClosed] = useState(false);
+    const streamingStatusText = useStreamingStatusText(statuses);
 
     // Preview state
     const [previewMode, setPreviewMode] = useState<PreviewMode>("view");
     const [pageOrientation, setPageOrientation] =
-        useState<PageOrientation>("original");
+        useState<PageOrientation>("landscape");
     const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -336,6 +384,7 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
         if (req.mode === 'view') {
             setTemplateNames([req.report_name || "Existing Report"]);
             setStatuses([{ step: "Loading existing report...", state: "started" }]);
+            setIsStreamClosed(true);
 
             fetcher(`/report/${req.session_id}`)
                 .then(res => {
@@ -361,6 +410,7 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
         }
 
         setTemplateNames(req.selected_template_ids);
+        setIsStreamClosed(false);
 
         const handler = new SSEBuildReportHandler(req as BuildReportRequest, {
             onStatus: (ev) => {
@@ -401,6 +451,7 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                 setErrors((prev) => [...prev, ev]);
             },
             onEnd: (payload) => {
+                setIsStreamClosed(true);
                 if (payload.status === "failed") {
                     setPhase((prev) => (prev === "done" ? "done" : "failed"));
                 }
@@ -466,13 +517,23 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                     onOrientationChange={setPageOrientation}
                     getPreviewIframe={getPreviewIframe}
                 />
-                <WebPreviewBody
-                    htmlContent={activeHtml}
-                    editMode={previewMode === "edit"}
-                    orientation={pageOrientation}
-                    onEditModeReady={handleEditModeReady}
-                    onIframeRef={handlePreviewIframeRef}
-                />
+                <div className="relative flex-1 min-h-0">
+                    <WebPreviewBody
+                        htmlContent={activeHtml}
+                        editMode={previewMode === "edit"}
+                        orientation={pageOrientation}
+                        onEditModeReady={handleEditModeReady}
+                        onIframeRef={handlePreviewIframeRef}
+                        streamingStatusText={streamingStatusText}
+                        className="h-full"
+                    />
+                    {!isStreamClosed && reports.length > 0 && (
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 text-xs text-slate-600 bg-white/90 border border-slate-200 rounded-full px-3 py-1 shadow-sm">
+                            <span className="w-3 h-3 rounded-full border-2 border-[#4c35c9]/30 border-t-[#4c35c9] animate-spin" />
+                            <span>Generating more pages...</span>
+                        </div>
+                    )}
+                </div>
             </WebPreview>
         </div>
     );
@@ -545,7 +606,7 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
     const rightPanelVisible = previewMode === "edit" || chatVisible;
 
     // ── Render ───────────────────────────────────────────────────────────────
-    if (phase === "loading" || (phase === "failed" && reports.length === 0)) {
+    if (phase === "failed" && reports.length === 0) {
         return (
             <div className="w-full h-full bg-white">
                 <BuildLoadingScreen

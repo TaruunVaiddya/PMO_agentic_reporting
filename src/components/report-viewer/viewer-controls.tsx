@@ -22,9 +22,9 @@ export type PreviewMode = 'view' | 'edit';
 export type PageOrientation = 'original' | 'portrait' | 'landscape';
 
 const ORIENTATION_LABELS: Record<PageOrientation, string> = {
-    original: 'Original',
-    portrait: 'A4 Portrait',
     landscape: 'A4 Landscape',
+    portrait: 'A4 Portrait',
+    original: 'Original',
 };
 
 // --- Shared smaller components from the old header ---
@@ -114,7 +114,7 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
     htmlContent,
     mode = 'view',
     onModeChange,
-    orientation = 'original',
+    orientation = 'landscape',
     onOrientationChange,
     onReload,
     onClose,
