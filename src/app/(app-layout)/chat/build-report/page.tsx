@@ -64,10 +64,19 @@ const extractHtmlContent = (output: any): string => {
     if (output && typeof output === "object") {
         if (output.result) {
             html = output.result;
+        } else if (output.code) {
+            html = output.code;
         } else if (output.html) {
             html = output.html;
+        } else if (Array.isArray(output.report_code)) {
+            html = output.report_code
+                .map((item: any) => item.html || item.code || "")
+                .filter(Boolean)
+                .join('\n<div class="page-break"></div>\n');
         } else if (output.report_code && typeof output.report_code === "string") {
             html = output.report_code;
+        } else if (output.report_code && typeof output.report_code.html === "string") {
+            html = output.report_code.html;
         }
     } else if (typeof output === "string") {
         html = output;
@@ -330,7 +339,7 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
 
             fetcher(`/report/${req.session_id}`)
                 .then(res => {
-                    const htmlContent = extractHtmlContent(res.report_code || res);
+                    const htmlContent = extractHtmlContent(res);
                     setReports([{
                         id: req.session_id,
                         template_id: 'existing',
@@ -369,15 +378,21 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                 });
             },
             onReport: (ev) => {
-                const htmlContent = extractHtmlContent(ev.output);
+                const newHtmlContent = extractHtmlContent(ev.output);
                 setReports((prev) => {
                     const idx = prev.findIndex((r) => r.id === ev.id);
                     if (idx !== -1) {
                         const next = [...prev];
-                        next[idx] = { ...ev, htmlContent };
+                        const existingHtml = next[idx].htmlContent || "";
+                        // Append with a page break so paginated views create a fresh A4 page
+                        const combinedHtml = existingHtml
+                            ? existingHtml + '\n<div class="page-break"></div>\n' + newHtmlContent
+                            : newHtmlContent;
+
+                        next[idx] = { ...ev, htmlContent: combinedHtml };
                         return next;
                     }
-                    return [...prev, { ...ev, htmlContent }];
+                    return [...prev, { ...ev, htmlContent: newHtmlContent }];
                 });
                 setPhase("done");
                 collapse();

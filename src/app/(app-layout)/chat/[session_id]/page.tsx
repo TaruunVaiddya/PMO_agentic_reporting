@@ -43,8 +43,15 @@ const extractHtmlContent = (output: any): string => {
   if (output && typeof output === "object") {
     if (output.result) {
       html = output.result;
+    } else if (output.code) {
+      html = output.code;
     } else if (output.html) {
       html = output.html;
+    } else if (Array.isArray(output.report_code)) {
+      html = output.report_code
+        .map((item: any) => item.html || item.code || "")
+        .filter(Boolean)
+        .join('\n<div class="page-break"></div>\n');
     } else if (output.report_code && typeof output.report_code === "string") {
       html = output.report_code;
     } else if (output.report_code && typeof output.report_code.html === "string") {
