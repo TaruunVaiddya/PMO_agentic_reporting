@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback, useContext } from "react";
+import { combineReportHtmls } from '@/components/report-viewer/pagination/pagination-engine';
 import { useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { cn } from "@/lib/utils";
@@ -56,6 +57,7 @@ interface StatusItem {
 
 interface BuiltReport extends ReportEvent {
     htmlContent: string;
+    htmlParts?: string[];// ← 
 }
 
 // ─── Utility ────────────────────────────────────────────────────────────────
@@ -83,6 +85,16 @@ const extractHtmlContent = (output: any): string => {
     }
     const match = html.trim().match(/^```(?:html)?\n?([\s\S]*?)\n?```$/);
     return match ? match[1].trim() : html.trim();
+};
+
+// ← extractHtmlParts AFTER extractHtmlContent so the reference resolves
+const extractHtmlParts = (output: any): string[] => {
+    if (output && typeof output === "object" && Array.isArray(output.report_code)) {
+        return output.report_code
+            .map((item: any) => item.html || item.code || "")
+            .filter(Boolean);
+    }
+    return [extractHtmlContent(output)];
 };
 
 // ─── Streaming status (typewriter) ─────────────────────────────────────────
@@ -388,14 +400,16 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
 
             fetcher(`/report/${req.session_id}`)
                 .then(res => {
-                    const htmlContent = extractHtmlContent(res);
+                    const htmlParts = extractHtmlParts(res);
+                    const htmlContent = combineReportHtmls(htmlParts);
                     setReports([{
                         id: req.session_id,
                         template_id: 'existing',
                         template_name: req.report_name || "Existing Report",
                         state: "output-available",
                         output: htmlContent,
-                        htmlContent
+                        htmlParts,
+                        htmlContent,
                     }]);
                     setStatuses([{ step: "Report loaded successfully", state: "completed" }]);
                     setPhase("done");
@@ -428,21 +442,24 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                 });
             },
             onReport: (ev) => {
-                const newHtmlContent = extractHtmlContent(ev.output);
+                const newParts = extractHtmlParts(ev.output);
                 setReports((prev) => {
                     const idx = prev.findIndex((r) => r.id === ev.id);
                     if (idx !== -1) {
                         const next = [...prev];
-                        const existingHtml = next[idx].htmlContent || "";
-                        // Append with a page break so paginated views create a fresh A4 page
-                        const combinedHtml = existingHtml
-                            ? existingHtml + '\n<div class="page-break"></div>\n' + newHtmlContent
-                            : newHtmlContent;
-
-                        next[idx] = { ...ev, htmlContent: combinedHtml };
+                        const updatedParts = [...(next[idx].htmlParts ?? []), ...newParts];
+                        next[idx] = {
+                            ...ev,
+                            htmlParts: updatedParts,
+                            htmlContent: combineReportHtmls(updatedParts),
+                        };
                         return next;
                     }
-                    return [...prev, { ...ev, htmlContent: newHtmlContent }];
+                    return [...prev, {
+                        ...ev,
+                        htmlParts: newParts,
+                        htmlContent: combineReportHtmls(newParts),
+                    }];
                 });
                 setPhase("done");
                 collapse();
@@ -665,9 +682,20 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                 <button
                     onClick={handleOpenChat}
                     title="Open Chat Assistant"
-                    className="absolute bottom-5 right-5 z-50 flex items-center justify-center w-11 h-11 rounded-full bg-[#4c35c9] hover:bg-[#3d28b0] text-white shadow-lg transition-all hover:scale-105 active:scale-95"
+                    className="absolute bottom-5 right-5 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-white shadow-lg transition-all hover:scale-105 active:scale-95 overflow-hidden"
                 >
-                    <MessageSquare size={18} />
+                    <span className="relative flex items-center justify-center w-full h-full rounded-full bg-white">
+                        <img
+                            src="/dotz-icon-bg.svg"
+                            alt="Dotz"
+                            className="w-full h-full"
+                        />
+                        {/* <img
+                            src="/ai-assistant-bubble-animation.gif"
+                            alt="Assistant"
+                            className="absolute w-full h-full bg-transparent"
+                        /> */}
+                    </span>
                 </button>
             )}
         </div>

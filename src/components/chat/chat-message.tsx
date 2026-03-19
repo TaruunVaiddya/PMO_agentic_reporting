@@ -90,7 +90,7 @@ export const ChatMessage = React.memo(({
   const processedEvents = React.useMemo(() => {
     if (!message.events || message.events.length === 0) return null;
 
-    // Create ordered items that maintain the sequence of events
+    // Ordered items maintain the true sequence of events including interleaved text
     const orderedItems: Array<{
       type: 'reasoning' | 'tool_call' | 'task' | 'report' | 'text';
       idx: number;
@@ -99,16 +99,36 @@ export const ChatMessage = React.memo(({
 
     const toolCallsMap = new Map<string, { data: any; idx: number }>();
     const tasksMap = new Map<string, { data: any; idx: number }>();
-    const textChunks: string[] = [];
+
+    // Track in-progress text and reasoning blocks
+    let currentTextChunks: string[] = [];
+    let currentTextStartIdx = -1;
+
     let currentReasoningChunks: string[] = [];
     let currentReasoningStartIdx = -1;
 
-    // Single pass through events for better performance
+    // Flush any accumulated text into orderedItems as a text block
+    const flushText = () => {
+      if (currentTextChunks.length > 0) {
+        orderedItems.push({
+          type: 'text',
+          idx: currentTextStartIdx,
+          data: { content: currentTextChunks.join('') }
+        });
+        currentTextChunks = [];
+        currentTextStartIdx = -1;
+      }
+    };
+
+    // Single pass through events
     for (let idx = 0; idx < message.events.length; idx++) {
       const event = message.events[idx];
 
       switch (event.event) {
         case 'reasoning':
+          // Reasoning interrupts text; flush any pending text first
+          flushText();
+
           if (event.data.delta) {
             if (currentReasoningStartIdx === -1) {
               currentReasoningStartIdx = idx;
@@ -116,7 +136,6 @@ export const ChatMessage = React.memo(({
             currentReasoningChunks.push(event.data.delta);
           }
           if (event.data.complete) {
-            // Add completed reasoning block at its position
             orderedItems.push({
               type: 'reasoning',
               idx: currentReasoningStartIdx,
@@ -132,64 +151,80 @@ export const ChatMessage = React.memo(({
           break;
 
         case 'tool_call':
-          // Track tool call and its first occurrence index
-          const existing = toolCallsMap.get(event.data.id);
-          if (existing) {
-            // Update existing tool call data
-            existing.data = { ...existing.data, ...event.data };
-          } else {
-            // First time seeing this tool call
-            toolCallsMap.set(event.data.id, { data: event.data, idx });
-            orderedItems.push({
-              type: 'tool_call',
-              idx,
-              data: { id: event.data.id } // Placeholder, will be filled later
-            });
+          // Tool calls interrupt text; flush any pending text first
+          flushText();
+
+          {
+            const existing = toolCallsMap.get(event.data.id);
+            if (existing) {
+              existing.data = { ...existing.data, ...event.data };
+            } else {
+              toolCallsMap.set(event.data.id, { data: event.data, idx });
+              orderedItems.push({
+                type: 'tool_call',
+                idx,
+                data: { id: event.data.id }
+              });
+            }
           }
           break;
 
         case 'task':
-          const existingTask = tasksMap.get(event.data.task.id);
-          const taskStatus: TaskStatus = event.data.task.status === 'error'
-            ? 'failed'
-            : event.data.task.status as TaskStatus;
+          // Tasks interrupt text; flush any pending text first
+          flushText();
 
-          if (existingTask) {
-            existingTask.data = { ...existingTask.data, ...event.data.task, status: taskStatus };
-          } else {
-            tasksMap.set(event.data.task.id, { data: { ...event.data.task, status: taskStatus }, idx });
-            orderedItems.push({
-              type: 'task',
-              idx,
-              data: { id: event.data.task.id }
-            });
+          {
+            const existingTask = tasksMap.get(event.data.task.id);
+            const taskStatus: TaskStatus = event.data.task.status === 'error'
+              ? 'failed'
+              : event.data.task.status as TaskStatus;
+
+            if (existingTask) {
+              existingTask.data = { ...existingTask.data, ...event.data.task, status: taskStatus };
+            } else {
+              tasksMap.set(event.data.task.id, { data: { ...event.data.task, status: taskStatus }, idx });
+              orderedItems.push({
+                type: 'task',
+                idx,
+                data: { id: event.data.task.id }
+              });
+            }
           }
           break;
 
         case 'report':
-          // Track report and its first occurrence index
-          const existingReport = toolCallsMap.get(event.data.id);
-          if (existingReport) {
-            // Update existing report data
-            existingReport.data = { ...existingReport.data, ...event.data };
-          } else {
-            // First time seeing this report
-            toolCallsMap.set(event.data.id, { data: event.data, idx });
-            orderedItems.push({
-              type: 'report',
-              idx,
-              data: { id: event.data.id } // Placeholder, will be filled later
-            });
+          // Reports interrupt text; flush any pending text first
+          flushText();
+
+          {
+            const existingReport = toolCallsMap.get(event.data.id);
+            if (existingReport) {
+              existingReport.data = { ...existingReport.data, ...event.data };
+            } else {
+              toolCallsMap.set(event.data.id, { data: event.data, idx });
+              orderedItems.push({
+                type: 'report',
+                idx,
+                data: { id: event.data.id }
+              });
+            }
           }
           break;
 
         case 'delta':
-          textChunks.push(event.data.delta);
+          // Accumulate text — do NOT flush; consecutive deltas form one text block
+          if (currentTextStartIdx === -1) {
+            currentTextStartIdx = idx;
+          }
+          currentTextChunks.push(event.data.delta);
           break;
       }
     }
 
-    // If there's incomplete reasoning, add it
+    // Flush any trailing text that wasn't interrupted
+    flushText();
+
+    // If there's incomplete reasoning at the end, add it
     if (currentReasoningChunks.length > 0) {
       orderedItems.push({
         type: 'reasoning',
@@ -201,31 +236,22 @@ export const ChatMessage = React.memo(({
       });
     }
 
-    // Fill in the actual tool call, report, and task data
+    // Fill in the actual tool call, report, and task data (resolve placeholders)
     for (let i = 0; i < orderedItems.length; i++) {
       const item = orderedItems[i];
       if (item.type === 'tool_call') {
         const toolData = toolCallsMap.get(item.data.id);
-        if (toolData) {
-          item.data = toolData.data;
-        }
+        if (toolData) item.data = toolData.data;
       } else if (item.type === 'report') {
         const reportData = toolCallsMap.get(item.data.id);
-        if (reportData) {
-          item.data = reportData.data;
-        }
+        if (reportData) item.data = reportData.data;
       } else if (item.type === 'task') {
         const taskData = tasksMap.get(item.data.id);
-        if (taskData) {
-          item.data = taskData.data;
-        }
+        if (taskData) item.data = taskData.data;
       }
     }
 
-    return {
-      orderedItems,
-      textContent: textChunks.join('')
-    };
+    return { orderedItems };
   }, [message.events]);
 
   return (
@@ -237,11 +263,10 @@ export const ChatMessage = React.memo(({
         "w-full flex flex-col gap-2",
         isUser ? 'items-end' : 'items-start'
       )}>
-        {/* Render events in their actual order */}
+        {/* Render events in their true backend order */}
         {isAssistant && processedEvents && (
           <>
             {processedEvents.orderedItems.map((item, itemIdx) => {
-              // Render based on item type
               if (item.type === 'reasoning') {
                 return (
                   <ReasoningBlock
@@ -249,6 +274,20 @@ export const ChatMessage = React.memo(({
                     data={item.data}
                     status={status}
                   />
+                );
+              }
+
+              if (item.type === 'text') {
+                return (
+                  <MessageContent
+                    key={`text-${item.idx}-${itemIdx}`}
+                    variant="contained"
+                    data-user={false}
+                  >
+                    <Response className='w-full'>
+                      {item.data.content}
+                    </Response>
+                  </MessageContent>
                 );
               }
 
@@ -395,21 +434,23 @@ export const ChatMessage = React.memo(({
           </div>
         )}
 
-        {/* Message content */}
-        <MessageContent
-          variant="contained"
-          data-user={isUser}
-        >
-          {isAssistant ? (
-            <Response className='w-full'>
-              {processedEvents ? processedEvents.textContent : message.content}
-            </Response>
-          ) : (
-            <div className="w-full font-medium">
-              {message.content}
-            </div>
-          )}
-        </MessageContent>
+        {/* Message content — only rendered for legacy (non-events) path or user messages */}
+        {(!processedEvents || isUser) && (
+          <MessageContent
+            variant="contained"
+            data-user={isUser}
+          >
+            {isAssistant ? (
+              <Response className='w-full'>
+                {message.content}
+              </Response>
+            ) : (
+              <div className="w-full font-medium">
+                {message.content}
+              </div>
+            )}
+          </MessageContent>
+        )}
 
         {/* Streaming indicator - shown at the end when streaming */}
         {isAssistant && message.isStreaming && status !== 'Failed' && (
@@ -508,7 +549,6 @@ const ReasoningBlock = React.memo(({ data, status }: { data: any; status?: ChatS
     </Reasoning>
   </div>
 ), (prevProps, nextProps) => {
-  // Custom comparison to optimize re-renders
   return (
     prevProps.data.content === nextProps.data.content &&
     prevProps.data.complete === nextProps.data.complete &&
@@ -573,7 +613,6 @@ const ToolCallBlock = React.memo(({ toolCall, onPreviewClick }: { toolCall: any;
     </div>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison to optimize re-renders
   return (
     prevProps.toolCall.id === nextProps.toolCall.id &&
     prevProps.toolCall.name === nextProps.toolCall.name &&
@@ -612,7 +651,6 @@ const TaskBlock = React.memo(({ task }: { task: any }) => (
     </Task>
   </div>
 ), (prevProps, nextProps) => {
-  // Custom comparison to optimize re-renders
   return (
     prevProps.task.id === nextProps.task.id &&
     prevProps.task.title === nextProps.task.title &&
@@ -660,14 +698,13 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate, 
 
     if (shouldAutoOpen) {
       hasAutoOpenedRef.current = true;
-      onPreviewClick(report, true); // Pass true to indicate this is an auto-open
+      onPreviewClick(report, true);
     }
   }, [report.state, onPreviewClick]);
 
   // Update preview when output becomes available (streaming with direct HTML)
   React.useEffect(() => {
     if (isCompleted && report.output && onReportOutputUpdate && !hasUpdatedOutputRef.current) {
-      // Only auto-update if it's direct HTML content (streaming), not report_id reference
       if (!isReportIdReference(report.output)) {
         hasUpdatedOutputRef.current = true;
         onReportOutputUpdate(report);
@@ -679,17 +716,12 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate, 
   const handleFetchAndPreview = React.useCallback(async () => {
     if (!isCompleted || !onPreviewClick) return;
 
-    // If it has fetched HTML, use that
     if (fetchedHtmlContent) {
-      const reportWithFetchedContent = {
-        ...report,
-        output: fetchedHtmlContent
-      };
+      const reportWithFetchedContent = { ...report, output: fetchedHtmlContent };
       onPreviewClick(reportWithFetchedContent, false);
       return;
     }
 
-    // If it's a report_id reference, fetch the content first
     if (hasReportIdReference && report.output && typeof report.output === 'object') {
       const reportId = report.output.report_id;
 
@@ -697,19 +729,10 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate, 
         setIsLoadingReport(true);
         setFetchError(null);
 
-        // Fetch the actual report HTML
         const htmlContent = await fetchReportById(reportId);
-
-        // Cache the fetched content
         setFetchedHtmlContent(htmlContent?.html);
 
-        // Create updated report object with the fetched HTML
-        const reportWithFetchedContent = {
-          ...report,
-          output: htmlContent
-        };
-
-        // Open preview with the fetched content
+        const reportWithFetchedContent = { ...report, output: htmlContent };
         onPreviewClick(reportWithFetchedContent, false);
       } catch (error) {
         console.error('Failed to fetch report:', error);
@@ -720,7 +743,6 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate, 
       return;
     }
 
-    // Direct HTML content (streaming) - just open it
     onPreviewClick(report, false);
   }, [
     isCompleted,
@@ -811,8 +833,6 @@ const ReportBlock = React.memo(({ report, onPreviewClick, onReportOutputUpdate, 
     </div>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison to optimize re-renders
-  // Only re-render if critical report properties change
   return (
     prevProps.report.id === nextProps.report.id &&
     prevProps.report.state === nextProps.report.state &&

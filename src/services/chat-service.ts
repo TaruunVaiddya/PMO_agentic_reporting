@@ -66,7 +66,7 @@ export default class SSEChatHandler {
         template_id: this.template_id,
       };
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/pmo-chat`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/report-assistant`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

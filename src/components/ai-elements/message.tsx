@@ -34,9 +34,9 @@ const messageContentVariants = cva(
           "group-[.is-user]:bg-[#1a2456]/10 group-[.is-user]:text-[#1a2456]",
           "group-[.is-user]:border-[#1a2456]/20",
           // Assistant message - Adaptive Neutral Theme
-          "group-[.is-assistant]:bg-muted/50 dark:group-[.is-assistant]:bg-transparent",
+          // "group-[.is-assistant]:bg-muted/50 dark:group-[.is-assistant]:bg-transparent",
           "group-[.is-assistant]:text-foreground dark:group-[.is-assistant]:text-[#E0E0E0]",
-          "group-[.is-assistant]:border-border dark:group-[.is-assistant]:border-zinc-700",
+          "group-[.is-assistant]:border-0 dark:group-[.is-assistant]:border-zinc-700",
         ],
         flat: [
           "group-[.is-user]:max-w-[100%] group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",

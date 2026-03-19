@@ -31,16 +31,29 @@ export const OriginalLayout: React.FC<ReportLayoutProps> = ({
     const injectOriginalIsolation = (html: string): string => {
         const originalViewStyles = `
       <style data-original-view="true">
+        html, body {
+          height: auto !important;
+          max-height: none !important;
+        }
         body {
           background: #fff !important;
           max-width: 70%;
           margin: 32px auto !important;
           padding: 40px !important;
           min-height: calc(100vh - 64px);
-          overflow-y: auto;
+          overflow-y: visible;
+          overflow-x: auto;
           box-sizing: border-box;
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
           border-radius: 4px !important;
+        }
+        table {
+          width: 100%;
+          max-width: 100%;
+          border-collapse: collapse;
+        }
+        table, thead, tbody, tr, td, th {
+          max-width: 100%;
         }
         @media screen and (max-width: 900px) {
           body {
@@ -54,10 +67,54 @@ export const OriginalLayout: React.FC<ReportLayoutProps> = ({
     `;
         const allStyles = iframeIsolationStyles + originalViewStyles;
 
-        if (html.includes('data-isolation="true"')) return html;
-        if (html.includes('</head>')) return html.replace('</head>', `${allStyles}</head>`);
-        if (html.includes('<html>')) return html.replace('<html>', `<html><head>${allStyles}</head>`);
-        return `<!DOCTYPE html><html><head>${allStyles}</head><body>${html}</body></html>`;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        if (doc.head && !doc.head.innerHTML.includes('data-isolation="true"')) {
+            doc.head.insertAdjacentHTML('beforeend', allStyles);
+        }
+
+        const bodyScripts: string[] = [];
+        doc.body?.querySelectorAll('script:not([src])').forEach((script) => {
+            const src = script.textContent?.trim() || '';
+            if (src) bodyScripts.push(src);
+            script.remove();
+        });
+
+        if (bodyScripts.length > 0) {
+            const encodedScripts = JSON
+                .stringify(bodyScripts)
+                .replace(/<\/script>/gi, '<\\/script>');
+            const runner = `
+  <script>
+    (function () {
+      var _bodyScripts = ${encodedScripts};
+      if (_bodyScripts.length === 0) return;
+      var _origAddEvent = window.addEventListener.bind(window);
+      window.addEventListener = function (type, handler, opts) {
+        if (type === 'DOMContentLoaded') {
+          setTimeout(function () {
+            try { handler(new Event('DOMContentLoaded')); } catch (e) {
+              console.error('[OriginalView] DOMContentLoaded handler error:', e);
+            }
+          }, 0);
+          return;
+        }
+        return _origAddEvent(type, handler, opts);
+      };
+      _bodyScripts.forEach(function (src) {
+        try { (0, eval)(src); } catch (e) {
+          console.error('[OriginalView] Body script eval error:', e);
+        }
+      });
+      window.addEventListener = _origAddEvent;
+    })();
+  </script>
+`;
+            doc.body?.insertAdjacentHTML('beforeend', runner);
+        }
+
+        return doc.documentElement?.outerHTML || html;
     };
 
     useEffect(() => {

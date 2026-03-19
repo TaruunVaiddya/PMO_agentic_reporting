@@ -12,24 +12,27 @@
  *               the current page — fills remaining space before moving on.
  *               <thead> is cloned and repeated on every continuation page.
  *   - Blocks  : ALWAYS recurse into children — never jump to a fresh page whole.
- *               This prevents large blank gaps when a wrapper div contains a
- *               table or other splittable content.
  *   - Atomic  : canvas / img / svg / chart containers — move to next page and
  *               scale-down if still too tall (never clip).
  *   - data-paginate="keep" : agent hint to keep an element whole on one page.
  *
- * ─── KEY FIX: Block routing (blank page bug) ────────────────────────────────
- * The previous version had an "Attempt 2b" that moved any element fitting on a
- * fresh page to the next page whole. For block divs wrapping a table (e.g.
- * <div class="overflow-x-auto"><table>…</table></div>), this caused the entire
- * table to jump to page 2, leaving a large blank gap on page 1.
+ * ─── KEY FIX: h-screen / explicit-height block detection ───────────────────
+ * Agent-generated reports often wrap all content in a single outer div with
+ * `h-screen`, `height:100vh`, `height:800px`, etc. This forces the div's
+ * offsetHeight to a fixed value (e.g. 900px) even though its real content
+ * (scrollHeight) may be 2000px+.
  *
- * The fix: blocks ALWAYS go through splitBlock(). The "fits on a fresh page"
- * shortcut is removed for blocks because:
- *   • If currentHeight === 0 and the block fits, Attempt 1 already placed it.
- *   • If currentHeight > 0, we must recurse to fill remaining space first.
- *   • If the block is taller than a full page, we must recurse anyway.
- * In all cases, splitBlock is correct and the shortcut is never needed.
+ * The paginator measured offsetHeight, saw 900 < 1047 (A4 available), and
+ * placed the whole div on page 1 as a single unit. The page's overflow:hidden
+ * then silently clipped everything past the A4 boundary — rows were lost.
+ *
+ * Fix: in Attempt 1 of smartPlace, after a block "fits" by height, also check
+ * whether scrollHeight > offsetHeight + threshold. If so, the element has an
+ * explicit height clipping its real content — recurse into it instead.
+ *
+ * ─── KEY FIX: Block routing (blank page bug) ────────────────────────────────
+ * Blocks ALWAYS go through splitBlock(). The "fits on a fresh page" shortcut
+ * is removed for blocks — it would skip the split and leave blank gaps.
  *
  * ─── KEY FIX: Body-script embedding ────────────────────────────────────────
  * Body scripts are JSON.stringify-encoded and executed via eval() to avoid
@@ -87,6 +90,114 @@ function stripMarkdownCodeFences(content: string): string {
   return trimmed;
 }
 
+
+export function combineReportHtmls(htmlStrings: string[]): string {
+  if (htmlStrings.length === 0) return '';
+  if (htmlStrings.length === 1) return stripMarkdownCodeFences(htmlStrings[0]);
+
+  const heads: string[] = [];
+  const bodies: string[] = [];
+    htmlStrings.forEach((rawHtml, i) => {
+        const html = stripMarkdownCodeFences(rawHtml).replace(
+          /<script\b[^>]*src=["']https:\/\/cdn\.tailwindcss\.com[^"']*["'][^>]*>\s*<\/script>/gi,
+          '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">'
+        );
+        const scope = `rs${i}`;
+
+        const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+        let headContent = headMatch ? headMatch[1] : '';  // ← let not const
+
+        const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+        let body = bodyMatch ? bodyMatch[1] : html;
+
+        // Build ids array first
+        const ids: string[] = [];
+        const idRegex = /\bid="([^"]+)"/g;
+        let m: RegExpExecArray | null;
+        while ((m = idRegex.exec(body)) !== null) {
+          if (!ids.includes(m[1])) ids.push(m[1]);
+        }
+        ids.sort((a, b) => b.length - a.length);
+
+        // Scope body HTML ids
+        ids.forEach(id => {
+          body = body.replace(
+            new RegExp(`\\bid="${escapeRegex(id)}"`, 'g'),
+            `id="${scope}-${id}"`
+          );
+        });
+
+        // Scope JS references
+        ids.forEach(id => {
+          body = body.replace(
+            new RegExp(`getElementById\\s*\\(\\s*['"]${escapeRegex(id)}['"]\\s*\\)`, 'g'),
+            `getElementById('${scope}-${id}')`
+          );
+          body = body.replace(
+            new RegExp(`querySelector\\s*\\(\\s*['"]#${escapeRegex(id)}['"]\\s*\\)`, 'g'),
+            `querySelector('#${scope}-${id}')`
+          );
+        });
+
+        // ← AFTER ids is built: rewrite CSS selectors in <head> <style> blocks
+        ids.forEach(id => {
+          headContent = headContent.replace(
+            /<style([^>]*)>([\s\S]*?)<\/style>/gi,
+            (_m, attrs, css) => {
+              const newCss = css.replace(
+                new RegExp(`#${escapeRegex(id)}(?=[\\s,{:>+~\\[\\)\\(\\n\\r])`, 'g'),
+                `#${scope}-${id}`
+              );
+              return `<style${attrs}>${newCss}</style>`;
+            }
+          );
+        });
+
+        heads.push(headContent);
+        bodies.push(body);
+    });
+
+  // Deduplicate head lines so Tailwind/fonts don't load 4×
+  const seenBlocks = new Set<string>();
+  const seenLines  = new Set<string>();
+  const dedupedParts: string[] = [];
+
+  for (const head of heads) {
+    // Extract and deduplicate complete <style> blocks as a unit
+    const remaining = head.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, (match) => {
+      const key = match.trim();
+      if (!seenBlocks.has(key)) {
+        seenBlocks.add(key);
+        dedupedParts.push(match);
+      }
+      return '';
+    });
+
+    // Deduplicate remaining lines (<link>, <meta>, etc.) individually
+    remaining.split('\n').forEach(line => {
+      const t = line.trim();
+      if (t && !seenLines.has(t)) {
+        seenLines.add(t);
+        dedupedParts.push(line);
+      }
+    });
+  }
+
+const deduped = dedupedParts.join('\n');
+
+  return `<!DOCTYPE html>
+      <html lang="en">
+      <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      ${deduped}
+      </head>
+      <body>
+      ${bodies.join('\n<div class="page-break"></div>\n')}
+      </body>
+      </html>`;
+      }
+
 // ============================================================================
 // Helper: parse HTML document into layout parts
 // ============================================================================
@@ -99,35 +210,38 @@ function parseHtmlDocument(htmlString: string): {
   bodyClass: string;
   bodyScripts: string[];
 } {
+  // Swap Tailwind Play CDN (JS runtime, blocked by CSP when allow-same-origin
+  // is present) with pre-built static CSS. No JS needed, no timing races.
+  const processedHtml = htmlString.replace(
+    /<script\b[^>]*src=["']https:\/\/cdn\.tailwindcss\.com[^"']*["'][^>]*>\s*<\/script>/gi,
+    '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">'
+  );
+
   const parser = new DOMParser();
-  const doc = parser.parseFromString(htmlString, 'text/html');
+  const doc = parser.parseFromString(processedHtml, 'text/html'); 
 
-  const headContent = doc.head?.innerHTML || '';
-  const bodyClass = doc.body?.className || '';
+  let headContent = doc.head?.innerHTML || '';
+  const bodyClass   = doc.body?.className || '';
 
-  // Header — prefer explicit data-template, fall back to semantic <header>
   const header =
     doc.querySelector('[data-template="header"]') ||
     doc.querySelector('header');
   const headerHtml = header?.outerHTML || '';
 
-  // Footer — prefer explicit data-template, fall back to semantic <footer>
   const footer =
     doc.querySelector('[data-template="footer"]') ||
     doc.querySelector('footer');
   const footerHtml = footer?.outerHTML || '';
 
-  // Main content — accept both "content" and "contents" to handle agent variance
   const main =
-    doc.querySelector('[data-template="content"]') ||
+    doc.querySelector('[data-template="content"]')  ||
     doc.querySelector('[data-template="contents"]') ||
     doc.querySelector('main');
 
   let mainContent = '';
   if (main) {
-    mainContent = main.innerHTML;
+    mainContent = main.outerHTML;
   } else {
-    // Fallback: clone body and strip known structural pieces
     const body = doc.body;
     if (body) {
       const clone = body.cloneNode(true) as HTMLElement;
@@ -140,16 +254,65 @@ function parseHtmlDocument(htmlString: string): {
     }
   }
 
-  // Collect inline body scripts. DOMParser does NOT execute them — we re-run
-  // them inside the iframe via eval() so Chart.js / DOM renderers work.
+  const scopeId = `r${Math.random().toString(36).slice(2, 8)}`;
+
+  const scopeDoc = parser.parseFromString(
+    `<div id="${scopeId}">${mainContent}</div>`,
+    'text/html'
+  );
+  const scopeRoot = scopeDoc.getElementById(scopeId)!;
+
+  // Build old→new id map and rename every element
+  const idMap: Record<string, string> = {};
+  scopeRoot.querySelectorAll('[id]').forEach(el => {
+    const oldId = el.getAttribute('id')!;
+    const newId = `${scopeId}-${oldId}`;
+    idMap[oldId] = newId;
+    el.setAttribute('id', newId);
+  });
+
+  mainContent = scopeRoot.innerHTML;
+  let updatedHeadContent = headContent;
+  Object.entries(idMap).forEach(([oldId, newId]) => {
+    updatedHeadContent = updatedHeadContent.replace(
+      /<style([^>]*)>([\s\S]*?)<\/style>/gi,
+      (_m, attrs, css) => {
+        const newCss = css.replace(
+          new RegExp(`#${escapeRegex(oldId)}(?=[\\s,{:>+~\\[\\)\\(\\n\\r])`, 'g'),
+          `#${newId}`
+        );
+        return `<style${attrs}>${newCss}</style>`;
+      }
+    );
+  });
+  headContent = updatedHeadContent;
+
+  // Rewrite scripts: patch getElementById / querySelector calls to use
+  // the new namespaced ids, and scope querySelector to the report root.
   const bodyScripts: string[] = [];
   doc.body?.querySelectorAll('script:not([src])').forEach(script => {
     if (header?.contains(script) || footer?.contains(script)) return;
-    const src = script.textContent?.trim() || '';
-    if (src) bodyScripts.push(src);
+    let src = script.textContent?.trim() || '';
+    if (!src) return;
+
+    // Replace getElementById('oldId') → getElementById('scopeId-oldId')
+    Object.entries(idMap).forEach(([oldId, newId]) => {
+      src = src.replace(
+        new RegExp(`getElementById\\s*\\(\\s*(['"\`])${escapeRegex(oldId)}\\1\\s*\\)`, 'g'),
+        `getElementById('${newId}')`
+      );
+    });
+
+    bodyScripts.push(src);
   });
+  // ── END ID SCOPING FIX ──────────────────────────────────────────────────
 
   return { headContent, headerHtml, footerHtml, mainContent, bodyClass, bodyScripts };
+}
+
+// Helper used by the scoping fix
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // ============================================================================
@@ -211,13 +374,11 @@ function generatePageCSS(config: Required<PaginationConfig>): string {
 
     .a4-page-footer { flex-shrink: 0 !important; flex-grow: 0 !important; }
 
-    /* position:fixed keeps the staging area out of scroll flow while still
-       allowing CSS frameworks (Tailwind) to fully resolve classes. */
     .content-source {
       position: fixed !important;
       left: -9999px !important;
       top: 0 !important;
-      visibility: hidden !important;
+      opacity: 0 !important;                  // ← visible to framework scanners
       pointer-events: none !important;
       ${contentScale !== 1 ? `zoom: ${contentScale} !important;` : ''}
     }
@@ -253,11 +414,9 @@ function generatePaginationScript(
     contentScale,
   } = config;
 
-  const zoomStyle = contentScale !== 1 ? `zoom:${contentScale}!important;` : '';
+  const zoomStyle      = contentScale !== 1 ? `zoom:${contentScale}!important;` : '';
   const contentPadding = `${marginTopMm}mm ${marginRightMm}mm ${marginBottomMm}mm ${marginLeftMm}mm`;
 
-  // JSON.stringify safely encodes backticks, ${, </script>, etc.
-  // DO NOT textually interpolate raw script source — causes SyntaxError.
   const encodedScripts = JSON
     .stringify(bodyScripts)
     .replace(/<\/script>/gi, '<\\/script>');
@@ -265,13 +424,12 @@ function generatePaginationScript(
   return `
 (function () {
 
-  // ── Wait for full page load (Tailwind CDN, Chart.js, fonts, images) ──────
   function waitForLoad(cb) {
     if (document.readyState === 'complete') { setTimeout(cb, 100); return; }
     var done = false;
     function go() { if (done) return; done = true; setTimeout(cb, 100); }
     window.addEventListener('load', go);
-    setTimeout(go, 2500); // hard fallback if an asset never loads
+    setTimeout(go, 2500);
   }
 
   waitForLoad(function () {
@@ -288,14 +446,9 @@ function generatePaginationScript(
     }
 
     // ── STEP 1: Run body scripts ──────────────────────────────────────────
-    //
-    // Scripts are JSON-encoded and executed via eval() so that template
-    // literals, backticks etc. in the originals work correctly.
-    //
-    // window.addEventListener is patched so any 'DOMContentLoaded' handler
-    // registered by the scripts fires immediately — the event has already
-    // fired by the time we reach here, so without this patch those handlers
-    // would silently never run (leaving tables empty, charts blank, etc.).
+    // JSON-encoded array executed via eval() — template literals, backticks,
+    // etc. all survive. window.addEventListener patched so DOMContentLoaded
+    // handlers fire immediately (event already fired).
 
     var _bodyScripts = ${encodedScripts};
 
@@ -315,20 +468,15 @@ function generatePaginationScript(
       };
 
       _bodyScripts.forEach(function (src) {
-        try {
-          (0, eval)(src); // indirect eval → runs in global (window) scope
-        } catch (e) {
+        try { (0, eval)(src); } catch (e) {
           console.error('[Paginator] Body script eval error:', e);
         }
       });
 
-      // Restore real addEventListener. DOMContentLoaded callbacks are already
-      // queued via setTimeout(0) and will fire on their own.
       window.addEventListener = _origAddEvent;
     }
 
-    // ── STEP 2: Wait for eval'd scripts + DOMContentLoaded callbacks ──────
-    // 200 ms covers the setTimeout(0) queued above plus a Chart.js paint frame.
+    // ── STEP 2: Wait for DOMContentLoaded callbacks + Chart.js paint ─────
     requestAnimationFrame(function () {
       setTimeout(runPagination, 200);
     });
@@ -346,10 +494,8 @@ function generatePaginationScript(
         var availableHeight = 0;
         var pageCount       = 0;
 
-        // ── Build a new A4 page, return its content div ───────────────────
         function createNewPage() {
           pageCount++;
-
           var page = document.createElement('div');
           page.className = 'a4-page';
           page.style.cssText = [
@@ -399,8 +545,6 @@ function generatePaginationScript(
           currentContent = content;
           currentHeight  = 0;
 
-          // Subtract padding so comparison is against real text-stack space.
-          // clientHeight includes padding — without this, bottom margin overflows.
           var cs = window.getComputedStyle(content);
           availableHeight = content.clientHeight
             - (parseFloat(cs.paddingTop)    || 0)
@@ -409,7 +553,6 @@ function generatePaginationScript(
           return content;
         }
 
-        // ── Outer height including margins ────────────────────────────────
         function outerHeight(el) {
           if (!el) return 0;
           var s = window.getComputedStyle(el);
@@ -418,7 +561,6 @@ function generatePaginationScript(
             + (parseFloat(s.marginBottom) || 0);
         }
 
-        // ── Trigger Chart.js resize after a canvas is re-parented ─────────
         function resizeCharts(el) {
           if (!window.Chart) return;
           el.querySelectorAll('canvas').forEach(function (c) {
@@ -427,39 +569,20 @@ function generatePaginationScript(
           });
         }
 
-        // ── Classify element for the correct split strategy ───────────────
-        //
-        // 'table'  → splitTable  (split rows, repeat thead)
-        // 'block'  → splitBlock  (recurse into children)
-        // 'atomic' → placeAtomic (move whole; scale-down if too tall)
         function elementType(el) {
           var tag = (el.tagName || '').toLowerCase();
-          // Agent explicitly marks this element as indivisible
           if (el.dataset && el.dataset.paginate === 'keep') return 'atomic';
-          // Native table
           if (tag === 'table') return 'table';
-          // Media / canvas — can't split mid-render
           if (tag === 'canvas' || tag === 'img' || tag === 'svg') return 'atomic';
-          // Any element containing a canvas (Chart.js wrapper)
           if (el.querySelector && el.querySelector('canvas')) return 'atomic';
-          // Generic block containers we can safely recurse into
-          var blockTags = ['div','section','article','ul','ol','dl','figure','aside'];
-          if (blockTags.indexOf(tag) >= 0 && el.children && el.children.length > 0) {
-            return 'block';
-          }
+          var blockTags = ['div','section','article','main','ul','ol','dl','figure','aside'];
+          if (blockTags.indexOf(tag) >= 0 && el.children && el.children.length > 0) return 'block';
           return 'atomic';
         }
 
-        // ────────────────────────────────────────────────────────────────────
-        // SPLIT: TABLE
-        //
-        // Moves rows one-by-one onto the current page, then continues onto
-        // new pages until all rows are placed. <thead> is cloned and repeated
-        // at the top of every page so column headers always show.
-        //
-        // Called both when there's content above the table (fills remaining
-        // space) and when the table alone is taller than a full page.
-        // ────────────────────────────────────────────────────────────────────
+        // ── SPLIT: TABLE ─────────────────────────────────────────────────
+        // Moves rows one-by-one, fills remaining space on the current page,
+        // then continues on new pages. <thead> repeated on every page.
         function splitTable(table) {
           var thead   = table.querySelector('thead');
           var tbody   = table.querySelector('tbody') || table;
@@ -467,9 +590,8 @@ function generatePaginationScript(
 
           if (allRows.length === 0) { placeAtomic(table); return; }
 
-          // Build a shell: same table attributes + cloned thead + fresh tbody
           function makeShell() {
-            var t = table.cloneNode(false); // attributes/classes only, no children
+            var t = table.cloneNode(false);
             t.style.width = '100%';
             if (thead) t.appendChild(thead.cloneNode(true));
             var tb = document.createElement('tbody');
@@ -478,7 +600,6 @@ function generatePaginationScript(
           }
 
           var rowIndex = 0;
-
           while (rowIndex < allRows.length) {
             var shell   = makeShell();
             currentContent.appendChild(shell.table);
@@ -488,14 +609,12 @@ function generatePaginationScript(
               shell.tbody.appendChild(allRows[r]);
               var tableH = outerHeight(shell.table);
 
-              // Row pushed us over the limit — pull it back and stop
               if (currentHeight + tableH > availableHeight && rowsFit > 0) {
                 shell.tbody.removeChild(allRows[r]);
                 break;
               }
 
-              // First row on this section still overflows (e.g. very tall row,
-              // or only a little space left) — open a fresh page and retry
+              // First row still overflows — open a fresh page and retry
               if (currentHeight + tableH > availableHeight && rowsFit === 0 && currentHeight > 0) {
                 shell.tbody.removeChild(allRows[r]);
                 currentContent.removeChild(shell.table);
@@ -510,84 +629,58 @@ function generatePaginationScript(
 
             currentHeight += outerHeight(shell.table);
             rowIndex      += rowsFit;
-
             if (rowIndex < allRows.length) createNewPage();
           }
         }
 
-        // ────────────────────────────────────────────────────────────────────
-        // SPLIT: BLOCK
-        //
-        // Unwraps the container and sends each child through smartPlace().
-        // The container's own styling (borders, overflow, etc.) is lost, but
-        // the children are placed correctly with proper page breaks.
-        //
-        // Note: for table wrapper divs (e.g. <div class="overflow-x-auto">
-        // <table>…</table></div>), the table's own border/styling is preserved
-        // because splitTable clones the table element's attributes.
-        // ────────────────────────────────────────────────────────────────────
+        // ── SPLIT: BLOCK ─────────────────────────────────────────────────
+        // Unwraps the container and recurses each child through smartPlace.
         function splitBlock(el) {
           var kids = Array.from(el.children);
           if (kids.length === 0) { placeAtomic(el); return; }
           for (var c = 0; c < kids.length; c++) smartPlace(kids[c]);
         }
 
-        // ────────────────────────────────────────────────────────────────────
-        // SPLIT: ATOMIC
-        //
-        // Element cannot be split. Opens a new page, then if the element is
-        // still too tall, CSS-scales it down so nothing is clipped.
-        // ────────────────────────────────────────────────────────────────────
+        // ── SPLIT: ATOMIC ────────────────────────────────────────────────
+        // Cannot split — move to a new page; scale-down if still too tall.
         function placeAtomic(el) {
           if (currentHeight > 0) createNewPage();
           currentContent.appendChild(el);
           resizeCharts(el);
           var h = outerHeight(el);
-
           if (h > availableHeight) {
-            var scale = (availableHeight / h) * 0.98; // 2% breathing room
+            var scale = (availableHeight / h) * 0.98;
             el.style.transformOrigin = 'top left';
             el.style.transform       = 'scale(' + scale + ')';
             el.style.marginBottom    = ((h * scale) - h) + 'px';
             h = availableHeight;
           }
-
           currentHeight += h;
         }
 
         // ────────────────────────────────────────────────────────────────────
-        // MAIN PLACER — entry point for every element
+        // MAIN PLACER
         //
-        // Decision tree (executed in order, returns on first match):
+        // Decision tree:
         //
-        // 1. Page-break hint (.page-break class) → force new page.
+        // 1. .page-break hint → force new page.
         //
-        // 2. Fits on current page → append. Done.
-        //    (This covers currentHeight=0 + h<=available naturally.)
+        // 2. Attempt to fit on current page (offsetHeight-based):
+        //    a. For BLOCK elements: also check scrollHeight > offsetHeight.
+        //       If true, the block has an explicit height (h-screen, height:Xpx)
+        //       that is hiding its real content. We must recurse into it —
+        //       otherwise the page's overflow:hidden clips the invisible rows.
+        //       This is the fix for the "rows truncated, not on next page" bug.
+        //    b. For all other types: if it fits, place it.
         //
-        // 3. Doesn't fit. Type-based routing:
-        //
-        //    TABLE → splitTable()
-        //      • Always fills remaining space on the current page first,
-        //        then continues row-by-row on new pages.
-        //      • Exception: if currentHeight=0 AND table fits → placed whole
-        //        (can't happen — Attempt 2 already handled that case, but
-        //        kept explicit for clarity).
-        //
-        //    BLOCK → splitBlock()  [THE KEY FIX]
-        //      • ALWAYS recurse — never jump to a fresh page whole.
-        //      • Proof that shortcut is never needed:
-        //        If currentHeight=0 and block fits → Attempt 2 placed it.
-        //        If currentHeight=0 and block too tall → must recurse anyway.
-        //        If currentHeight>0 → recurse to fill remaining space.
-        //      • This is what prevents large blank gaps when a wrapper div
-        //        (like <div class="overflow-x-auto">) wraps a long table.
-        //
-        //    ATOMIC → move to fresh page; scale-down if still too tall.
+        // 3. Doesn't fit — type-based routing:
+        //    TABLE  → splitTable  (fills remaining space, then continues)
+        //    BLOCK  → splitBlock  (always recurse — never jump whole)
+        //    ATOMIC → move to fresh page; scale-down if taller than a page
         // ────────────────────────────────────────────────────────────────────
         function smartPlace(child) {
 
-          // ── 1. Agent page-break hint ──────────────────────────────────────
+          // ── 1. Page-break hint ───────────────────────────────────────────
           var isBreak = child.classList && child.classList.contains('page-break');
           if (!isBreak && child.querySelector) {
             var inner = child.querySelector('.page-break');
@@ -598,28 +691,64 @@ function generatePaginationScript(
           // ── 2. Try to fit on the current page ────────────────────────────
           currentContent.appendChild(child);
           resizeCharts(child);
-          var h = outerHeight(child);
+          var h    = outerHeight(child);
+          var type = elementType(child);
 
           if (currentHeight + h <= availableHeight) {
-            currentHeight += h; // fits — done
+
+            // ── 2a. Block overflow check (THE KEY FIX) ───────────────────
+            //
+            // Agent reports often wrap everything in one outer div with
+            // h-screen / height:100vh / height:Xpx. offsetHeight = viewport
+            // height (e.g. 900px) which fits inside the A4 content area
+            // (~1047px), so the paginator would place it whole. But the real
+            // content (scrollHeight) may be 2000px+, and the page's
+            // overflow:hidden silently clips all the excess rows.
+            //
+            // When scrollHeight substantially exceeds offsetHeight, the
+            // element has an explicit height constraint hiding its content.
+            // Remove it from the page and recurse so every child is placed
+            // individually and table rows flow to continuation pages.
+            if (type === 'block' && child.scrollHeight > child.offsetHeight + 10) {
+              // Strip explicit height constraints so the element can flow naturally,
+              // preserving its own text-align/flex/etc. context for children.
+              child.style.height = 'auto';
+              child.style.minHeight = '0';
+              child.style.maxHeight = 'none';
+              child.style.overflow = 'visible';
+              ['h-screen', 'h-full', 'min-h-screen', 'max-h-screen',
+              'overflow-hidden', 'overflow-auto', 'overflow-scroll'].forEach(function (cls) {
+                  child.classList.remove(cls);
+              });
+
+              var strippedH = outerHeight(child);
+
+              // If it fits now, keep it whole — all styles/centering preserved.
+              if (currentHeight + strippedH <= availableHeight) {
+                  currentHeight += strippedH;
+                  return;
+              }
+
+              // Truly multi-page — recurse into children.
+              currentContent.removeChild(child);
+              splitBlock(child);
+              return;
+          }
+
+            currentHeight += h; // fits and content is not hidden — done
             return;
           }
 
-          // Doesn't fit — remove and route by type
+          // Doesn't fit on current page — remove and route by type
           currentContent.removeChild(child);
-          var type = elementType(child);
 
-          // ── 3a. TABLE ─────────────────────────────────────────────────────
+          // ── 3a. TABLE ────────────────────────────────────────────────────
           if (type === 'table') {
-            // If we're at the top of a fresh page AND the table fits whole,
-            // just place it (splitTable would also work but this is faster).
-            // Note: currentHeight=0 + h<=available was already caught in step 2,
-            // so this branch actually means currentHeight>0 OR h>available.
             splitTable(child);
             return;
           }
 
-          // ── 3b. BLOCK — always recurse, never jump to fresh page whole ────
+          // ── 3b. BLOCK — always recurse, never jump to fresh page whole ───
           if (type === 'block') {
             splitBlock(child);
             return;
@@ -627,13 +756,11 @@ function generatePaginationScript(
 
           // ── 3c. ATOMIC ────────────────────────────────────────────────────
           if (h <= availableHeight) {
-            // Fits on a fresh page — move it there whole
             createNewPage();
             currentContent.appendChild(child);
             resizeCharts(child);
             currentHeight = outerHeight(child);
           } else {
-            // Too tall even for a fresh page — scale it down
             placeAtomic(child);
           }
         }
@@ -654,12 +781,10 @@ function generatePaginationScript(
           });
         });
 
-        // ── Hide staging elements ─────────────────────────────────────────
         contentSource.style.display = 'none';
         if (headerTpl) headerTpl.style.display = 'none';
         if (footerTpl) footerTpl.style.display = 'none';
 
-        // ── Responsive scale on narrow screens ────────────────────────────
         var pageWidthPx = ${pageWidthMm} * 3.7795275591;
         if (typeof ResizeObserver !== 'undefined') {
           new ResizeObserver(function (entries) {
@@ -675,7 +800,6 @@ function generatePaginationScript(
 
       } catch (err) {
         console.error('[Paginator] Fatal error:', err);
-        // Last-resort: show raw content rather than a blank screen
         if (contentSource) {
           contentSource.style.position   = 'static';
           contentSource.style.visibility = 'visible';
@@ -683,14 +807,23 @@ function generatePaginationScript(
         }
         finish(1);
       }
-    } // end runPagination
-
-    function finish(count) {
-      window.__paginationComplete = true;
-      window.parent.postMessage({ type: 'PAGINATION_COMPLETE', pageCount: count }, '*');
     }
 
-  }); // end waitForLoad
+   function finish(count) {
+      window.__paginationComplete = true;
+      // Double rAF: gives Tailwind CDN / other dynamic CSS frameworks
+      // two frame cycles to process moved elements before the parent
+      // reveals the iframe. Without this, elements appear unstyled
+      // for a few frames because MutationObserver fires asynchronously
+      // after the DOM moves that pagination performs.
+      requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+              window.parent.postMessage({ type: 'PAGINATION_COMPLETE', pageCount: count }, '*');
+          });
+      });
+  }
+
+  });
 
 })();
 `;
@@ -706,13 +839,13 @@ export async function paginateReport(
 ): Promise<string> {
   if (!htmlString || htmlString.trim().length < 50) return htmlString;
 
-  const cleanedHtml = stripMarkdownCodeFences(htmlString);
-  const finalConfig = { ...DEFAULT_CONFIG, ...config };
-  const parsed = parseHtmlDocument(cleanedHtml);
-  const pageCSS = generatePageCSS(finalConfig);
+  const cleanedHtml  = stripMarkdownCodeFences(htmlString);
+  const finalConfig  = { ...DEFAULT_CONFIG, ...config };
+  const parsed       = parseHtmlDocument(cleanedHtml);
+  const pageCSS      = generatePageCSS(finalConfig);
   const paginationJS = generatePaginationScript(finalConfig, parsed.bodyScripts);
 
-  const pageW = finalConfig.pageWidthMm;
+  const pageW    = finalConfig.pageWidthMm;
   const contentW = pageW - finalConfig.marginLeftMm - finalConfig.marginRightMm;
 
   return `<!DOCTYPE html>
@@ -726,19 +859,17 @@ export async function paginateReport(
 <body class="${parsed.bodyClass}">
 
   ${parsed.headerHtml
-      ? `<div class="header-template" style="position:fixed;left:-9999px;top:0;visibility:hidden;width:${pageW}mm;">${parsed.headerHtml}</div>`
-      : ''}
+    ? `<div class="header-template" style="position:fixed;left:-9999px;top:0;visibility:hidden;width:${pageW}mm;">${parsed.headerHtml}</div>`
+    : ''}
 
   ${parsed.footerHtml
-      ? `<div class="footer-template" style="position:fixed;left:-9999px;top:0;visibility:hidden;width:${pageW}mm;">${parsed.footerHtml}</div>`
-      : ''}
+    ? `<div class="footer-template" style="position:fixed;left:-9999px;top:0;visibility:hidden;width:${pageW}mm;">${parsed.footerHtml}</div>`
+    : ''}
 
-  <!-- Hidden staging area: content measured here before being moved into pages -->
   <div class="content-source" style="width:${contentW}mm;">
     ${parsed.mainContent}
   </div>
 
-  <!-- Page container — populated entirely by the pagination script below -->
   <div class="a4-page-container">
     <div class="a4-page" style="display:flex;align-items:center;justify-content:center;">
       <div style="text-align:center;color:#999;font-family:sans-serif;font-size:13px;">
@@ -768,24 +899,16 @@ export function needsPagination(htmlString: string): boolean {
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 export interface UsePaginatedReportOptions {
-  /** Enable/disable pagination entirely */
   enabled?: boolean;
-  /** Pagination configuration */
   config?: PaginationConfig;
 }
 
 export interface UsePaginatedReportReturn {
-  /** Paginated HTML ready for an <iframe srcDoc> */
   paginatedHtml: string;
-  /** True while the iframe script is still running */
   isPaginating: boolean;
-  /** Non-null if an error was thrown before producing output */
   error: string | null;
-  /** Page count reported by the iframe script */
   pageCount: number;
-  /** True once at least one pagination cycle has completed successfully */
   wasPaginated: boolean;
-  /** Force a fresh pagination pass with the last known content */
   repaginate: () => void;
 }
 
@@ -796,43 +919,27 @@ export function usePaginatedReport(
   const { enabled = true, config = {} } = options;
 
   const [paginatedHtml, setPaginatedHtml] = useState('');
-  const [isPaginating, setIsPaginating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pageCount, setPageCount] = useState(0);
-  const [wasPaginated, setWasPaginated] = useState(false);
+  const [isPaginating,  setIsPaginating]  = useState(false);
+  const [error,         setError]         = useState<string | null>(null);
+  const [pageCount,     setPageCount]     = useState(0);
+  const [wasPaginated,  setWasPaginated]  = useState(false);
 
   const lastContentRef = useRef('');
-  const lastConfigRef = useRef<PaginationConfig>(config);
-  // Safety net: if PAGINATION_COMPLETE never arrives (script crash, CDN block,
-  // etc.) we unblock the UI after 12 s so the spinner never hangs forever.
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastConfigRef  = useRef<PaginationConfig>(config);
+  const timeoutRef     = useRef<NodeJS.Timeout | null>(null);
 
   const clearSafetyTimeout = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
   }, []);
 
   const doPagination = useCallback(async (content: string) => {
-    if (!content) {
-      setPaginatedHtml('');
-      setPageCount(0);
-      setWasPaginated(false);
-      return;
-    }
+    if (!content) { setPaginatedHtml(''); setPageCount(0); setWasPaginated(false); return; }
 
-    if (!enabled) {
-      setPaginatedHtml(content);
-      setPageCount(1);
-      setWasPaginated(false);
-      return;
-    }
+    if (!enabled) { setPaginatedHtml(content); setPageCount(1); setWasPaginated(false); return; }
 
     setIsPaginating(true);
     setError(null);
 
-    // Arm the safety net before the async work starts
     clearSafetyTimeout();
     timeoutRef.current = setTimeout(() => {
       console.warn('[usePaginatedReport] Timeout — forcing completion');
@@ -843,20 +950,18 @@ export function usePaginatedReport(
 
     try {
       const result = await paginateReport(content, config);
-      // HTML is ready — isPaginating stays true until iframe posts PAGINATION_COMPLETE
       setPaginatedHtml(result);
     } catch (err) {
       clearSafetyTimeout();
       const msg = err instanceof Error ? err.message : 'Pagination failed';
       setError(msg);
-      setPaginatedHtml(content); // fall back to raw content
+      setPaginatedHtml(content);
       setPageCount(1);
       setWasPaginated(false);
       setIsPaginating(false);
     }
   }, [enabled, config, clearSafetyTimeout]);
 
-  // Listen for the iframe's completion postMessage
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       if (event.data?.type !== 'PAGINATION_COMPLETE') return;
@@ -873,18 +978,16 @@ export function usePaginatedReport(
     if (lastContentRef.current) doPagination(lastContentRef.current);
   }, [doPagination]);
 
-  // Re-run when content or relevant config dimensions change
   useEffect(() => {
     const configChanged =
-      config.pageWidthMm !== lastConfigRef.current.pageWidthMm ||
+      config.pageWidthMm  !== lastConfigRef.current.pageWidthMm  ||
       config.pageHeightMm !== lastConfigRef.current.pageHeightMm ||
       config.contentScale !== lastConfigRef.current.contentScale;
 
     if (htmlContent === lastContentRef.current && !configChanged) return;
 
     lastContentRef.current = htmlContent || '';
-    lastConfigRef.current = config;
-
+    lastConfigRef.current  = config;
     doPagination(htmlContent || '');
   }, [htmlContent, config, doPagination]);
 

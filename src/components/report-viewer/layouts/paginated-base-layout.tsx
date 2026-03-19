@@ -101,7 +101,7 @@ export const PaginatedBaseLayout: React.FC<PaginatedLayoutProps> = ({
 
     const paginationConfig = React.useMemo(() => {
         if (orientation === 'landscape') {
-            return { pageWidthMm: 297, pageHeightMm: 210, contentScale: 0.75 };
+            return { pageWidthMm: 297, pageHeightMm: 210, contentScale: 0.85 };
         }
         return {};
     }, [orientation]);
