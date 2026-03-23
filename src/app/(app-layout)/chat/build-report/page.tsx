@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback, useContext } from "react";
-import { combineReportHtmls } from '@/components/report-viewer/pagination/pagination-engine';
 import { useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { cn } from "@/lib/utils";
@@ -34,12 +33,10 @@ import {
     ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import useChatIds from "@/hooks/chat-store-hooks/use-chat-ids";
-import type { ToolCallData } from "@/components/chat/chat-message";
 import {
     AlertCircle,
     CheckCircle2,
     Loader2,
-    MessageSquare,
     X,
 } from "lucide-react";
 import { EditPanel } from "@/components/editor/edit-panel";
@@ -48,7 +45,8 @@ import { fetcher } from "@/lib/get-fetcher";
 // ─── Storage Key ──────────────────────────────────────────────────────────────
 const STORAGE_KEY = "buildReportRequest";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 interface StatusItem {
     step: string;
     state: StatusEvent["state"];
@@ -56,48 +54,109 @@ interface StatusItem {
 }
 
 interface BuiltReport extends ReportEvent {
-    htmlContent: string;
-    htmlParts?: string[];// ← 
+    /** One HTML string per source report page — NOT combined. */
+    htmlPages: string[];
+    /** From layout.header — injected into every A4 page header slot. */
+    headerHtml?: string;
+    /** From layout.footer — injected into every A4 page footer slot. */
+    footerHtml?: string;
 }
 
-// ─── Utility ────────────────────────────────────────────────────────────────
-const extractHtmlContent = (output: any): string => {
-    let html = "";
-    if (output && typeof output === "object") {
-        if (output.result) {
-            html = output.result;
-        } else if (output.code) {
-            html = output.code;
-        } else if (output.html) {
-            html = output.html;
-        } else if (Array.isArray(output.report_code)) {
-            html = output.report_code
-                .map((item: any) => item.html || item.code || "")
-                .filter(Boolean)
-                .join('\n<div class="page-break"></div>\n');
-        } else if (output.report_code && typeof output.report_code === "string") {
-            html = output.report_code;
-        } else if (output.report_code && typeof output.report_code.html === "string") {
-            html = output.report_code.html;
-        }
-    } else if (typeof output === "string") {
-        html = output;
-    }
-    const match = html.trim().match(/^```(?:html)?\n?([\s\S]*?)\n?```$/);
-    return match ? match[1].trim() : html.trim();
-};
+// ─── Utility — HTML extraction ────────────────────────────────────────────────
 
-// ← extractHtmlParts AFTER extractHtmlContent so the reference resolves
+/**
+ * Extracts individual HTML page strings from a report output object.
+ * Returns one string per logical page (not combined).
+ */
 const extractHtmlParts = (output: any): string[] => {
-    if (output && typeof output === "object" && Array.isArray(output.report_code)) {
-        return output.report_code
+    if (!output) return [];
+
+    // Array of page objects — preferred shape
+    if (typeof output === "object" && Array.isArray(output.report_code)) {
+        const parts = output.report_code
             .map((item: any) => item.html || item.code || "")
-            .filter(Boolean);
+            .filter(Boolean) as string[];
+        if (parts.length > 0) return parts;
     }
-    return [extractHtmlContent(output)];
+
+    // Single html/result/code field
+    let single = "";
+    if (typeof output === "string") {
+        single = output;
+    } else if (typeof output === "object") {
+        single =
+            output.html ||
+            output.result ||
+            output.code ||
+            (typeof output.report_code === "string" ? output.report_code : "") ||
+            (typeof output.report_code?.html === "string" ? output.report_code.html : "");
+    }
+
+    // Strip markdown fences
+    const m = single.trim().match(/^```(?:html)?\n?([\s\S]*?)\n?```$/);
+    const clean = m ? m[1].trim() : single.trim();
+
+    return clean ? [clean] : [];
 };
 
-// ─── Streaming status (typewriter) ─────────────────────────────────────────
+/**
+ * Extracts header/footer HTML from the layout field of a report output.
+ *
+ * Handles all known API response shapes:
+ *   1. Top-level layout:    { html, layout: { header, footer } }
+ *   2. In report_code item: { report_code: [{ html, layout: { header, footer } }] }
+ *   3. Single report_code:  { report_code: { html, layout: { header, footer } } }
+ *
+ * Logs clearly when not found so future shape changes are easy to diagnose.
+ */
+const extractLayout = (output: any): { headerHtml: string; footerHtml: string } => {
+    const empty = { headerHtml: "", footerHtml: "" };
+    if (!output || typeof output !== "object") return empty;
+
+    // Shape 1 — layout at top level
+    if (output.layout) {
+        return {
+            headerHtml: output.layout.header || "",
+            footerHtml: output.layout.footer || "",
+        };
+    }
+
+    // Shape 2 — layout nested inside report_code array items
+    // e.g. { report_code: [{ html: "...", layout: { footer: "...", header: "" } }] }
+    if (Array.isArray(output.report_code)) {
+        for (const item of output.report_code) {
+            if (item?.layout) {
+                return {
+                    headerHtml: item.layout.header || "",
+                    footerHtml: item.layout.footer || "",
+                };
+            }
+        }
+    }
+
+    // Shape 3 — report_code as a single object (not array)
+    if (output.report_code && typeof output.report_code === "object" && output.report_code.layout) {
+        return {
+            headerHtml: output.report_code.layout.header || "",
+            footerHtml: output.report_code.layout.footer || "",
+        };
+    }
+
+    // Not found — log once so we can identify new shapes quickly
+    if (process.env.NODE_ENV !== "production") {
+        console.warn("[extractLayout] layout not found. Output keys:", Object.keys(output));
+    }
+    return empty;
+};
+
+/**
+ * Derives a plain combined HTML string for copy/download purposes only.
+ * Not used for rendering — rendering always uses htmlPages[].
+ */
+const combineForDownload = (pages: string[]): string => pages.join("\n");
+
+// ─── Streaming status (typewriter) ───────────────────────────────────────────
+
 function useStreamingStatusText(statuses: StatusItem[]) {
     const [queue, setQueue] = useState<string[]>([]);
     const [displayText, setDisplayText] = useState("");
@@ -143,7 +202,8 @@ function useStreamingStatusText(statuses: StatusItem[]) {
     return displayText || "Formatting report...";
 }
 
-// ─── Loading Screen ──────────────────────────────────────────────────────────
+// ─── Loading Screen ───────────────────────────────────────────────────────────
+
 function BuildLoadingScreen({
     statuses,
     errors,
@@ -156,7 +216,7 @@ function BuildLoadingScreen({
     return (
         <div className="flex flex-col items-center justify-center w-full h-full bg-white">
             <div className="flex flex-col items-center gap-6 w-full max-w-md px-6">
-                {/* spinner */}
+                {/* Spinner */}
                 <div className="relative">
                     <div className="w-16 h-16 rounded-full border-4 border-[#4c35c9]/20 border-t-[#4c35c9] animate-spin" />
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -187,7 +247,7 @@ function BuildLoadingScreen({
                     </p>
                 </div>
 
-                {/* status steps */}
+                {/* Status steps */}
                 {statuses.length > 0 && (
                     <div className="w-full flex flex-col gap-2 bg-slate-50 rounded-lg border border-slate-200 p-4 max-h-64 overflow-y-auto">
                         {statuses.map((s, i) => (
@@ -208,7 +268,7 @@ function BuildLoadingScreen({
                     </div>
                 )}
 
-                {/* errors */}
+                {/* Errors */}
                 {errors.length > 0 && (
                     <div className="w-full flex flex-col gap-2">
                         {errors.map((e, i) => (
@@ -227,7 +287,8 @@ function BuildLoadingScreen({
     );
 }
 
-// ─── Report Tab Bar ──────────────────────────────────────────────────────────
+// ─── Report Tab Bar ───────────────────────────────────────────────────────────
+
 function ReportTabBar({
     reports,
     activeIndex,
@@ -259,6 +320,7 @@ function ReportTabBar({
 }
 
 // ─── Inner page (needs chat store in context) ─────────────────────────────────
+
 const ANIMATION_DURATION = 300;
 
 function BuildReportInner({ sessionId }: { sessionId: string }) {
@@ -278,9 +340,14 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
 
     // Preview state
     const [previewMode, setPreviewMode] = useState<PreviewMode>("view");
-    const [pageOrientation, setPageOrientation] =
-        useState<PageOrientation>("landscape");
-    const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
+    const [pageOrientation, setPageOrientation] = useState<PageOrientation>("landscape");
+
+    // Zoom state — forwarded to PaginatedBaseLayout via WebPreviewBody
+    const [userScale, setUserScale] = useState(1);
+    const [fitScale, setFitScale] = useState(1);
+    const [totalPageCount, setTotalPageCount] = useState(0);
+
+    // Single iframe ref — set via onIframeRef, used for both edit mode and print
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
     // Chat panel state
@@ -288,16 +355,11 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
     const [useResizablePanels, setUseResizablePanels] = useState(false);
     const [isClosingChat, setIsClosingChat] = useState(false);
     const allChatIds = useChatIds();
-    const chatIds = React.useMemo(
-        () => Array.from(new Set(allChatIds)),
-        [allChatIds]
-    );
+    const chatIds = React.useMemo(() => Array.from(new Set(allChatIds)), [allChatIds]);
 
     // Edit mode
     const { enableEditMode, disableEditMode, selectedElement, clearSelection } =
-        useEditMode({
-            onElementSelected: () => { },
-        });
+        useEditMode({ onElementSelected: () => {} });
 
     const handleModeChange = useCallback(
         (newMode: PreviewMode) => {
@@ -307,19 +369,22 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
         [clearSelection]
     );
 
-    const handleEditModeReady = useCallback(
-        async (iframe: HTMLIFrameElement) => {
+    // ── Iframe ref callback ───────────────────────────────────────────────────
+    // Called by WebPreviewBody (which calls PaginatedBaseLayout's onIframeRef).
+    // Single ref used for both edit mode and print — no duplication.
+    const handleIframeRef = useCallback(
+        (iframe: HTMLIFrameElement | null) => {
             iframeRef.current = iframe;
-            if (previewMode === "edit") {
-                await enableEditMode(iframe);
-            } else {
-                disableEditMode(iframe);
+            // If edit mode is already active when the iframe (re)mounts, enable immediately
+            if (iframe && previewMode === "edit") {
+                enableEditMode(iframe);
             }
         },
-        [previewMode, enableEditMode, disableEditMode]
+        [previewMode, enableEditMode]
     );
 
-    React.useEffect(() => {
+    // Apply / remove edit mode when mode changes
+    useEffect(() => {
         if (!iframeRef.current) return;
         if (previewMode === "edit") {
             enableEditMode(iframeRef.current);
@@ -329,16 +394,13 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
         }
     }, [previewMode, enableEditMode, disableEditMode, clearSelection]);
 
-    const handlePropertyUpdate = useCallback(
-        (property: string, value: string) => {
-            if (!iframeRef.current?.contentWindow) return;
-            iframeRef.current.contentWindow.postMessage(
-                { type: "APPLY_STYLE", property, value },
-                "*"
-            );
-        },
-        []
-    );
+    const handlePropertyUpdate = useCallback((property: string, value: string) => {
+        if (!iframeRef.current?.contentWindow) return;
+        iframeRef.current.contentWindow.postMessage(
+            { type: "APPLY_STYLE", property, value },
+            "*"
+        );
+    }, []);
 
     const handleResetElement = useCallback(() => {
         if (!iframeRef.current?.contentWindow) return;
@@ -350,42 +412,26 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
         clearSelection();
     }, [clearSelection]);
 
-    const getPreviewIframe = useCallback(
-        () => previewIframeRef.current,
-        []
-    );
+    const getPreviewIframe = useCallback(() => iframeRef.current, []);
 
-    const handlePreviewIframeRef = useCallback(
-        (iframe: HTMLIFrameElement | null) => {
-            previewIframeRef.current = iframe;
-        },
-        []
-    );
-
-    // ── Chat panel animation ────────────────────────────────────────────────
+    // ── Chat panel animation ──────────────────────────────────────────────────
     useEffect(() => {
         if (chatOpen && !isClosingChat && !useResizablePanels) {
-            const t = setTimeout(
-                () => setUseResizablePanels(true),
-                ANIMATION_DURATION
-            );
+            const t = setTimeout(() => setUseResizablePanels(true), ANIMATION_DURATION);
             return () => clearTimeout(t);
         } else if ((isClosingChat || !chatOpen) && useResizablePanels) {
             setUseResizablePanels(false);
         }
     }, [chatOpen, useResizablePanels, isClosingChat]);
 
-    // ── SSE: start on mount ──────────────────────────────────────────────────
+    // ── SSE: start on mount ───────────────────────────────────────────────────
     const sseRef = useRef<SSEBuildReportHandler | null>(null);
 
     useEffect(() => {
         const raw = sessionStorage.getItem(STORAGE_KEY);
-        if (!raw) {
-            router.replace("/chat");
-            return;
-        }
+        if (!raw) { router.replace("/chat"); return; }
 
-        let req: BuildReportRequest & { mode?: 'view', report_name?: string };
+        let req: BuildReportRequest & { mode?: "view"; report_name?: string };
         try {
             req = JSON.parse(raw);
         } catch {
@@ -393,29 +439,31 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
             return;
         }
 
-        if (req.mode === 'view') {
+        // ── View mode: load existing report ───────────────────────────────────
+        if (req.mode === "view") {
             setTemplateNames([req.report_name || "Existing Report"]);
             setStatuses([{ step: "Loading existing report...", state: "started" }]);
             setIsStreamClosed(true);
 
             fetcher(`/report/${req.session_id}`)
-                .then(res => {
-                    const htmlParts = extractHtmlParts(res);
-                    const htmlContent = combineReportHtmls(htmlParts);
+                .then((res) => {
+                    const htmlPages = extractHtmlParts(res);
+                    const { headerHtml, footerHtml } = extractLayout(res);
                     setReports([{
                         id: req.session_id,
-                        template_id: 'existing',
+                        template_id: "existing",
                         template_name: req.report_name || "Existing Report",
                         state: "output-available",
-                        output: htmlContent,
-                        htmlParts,
-                        htmlContent,
+                        output: res,
+                        htmlPages,
+                        headerHtml,
+                        footerHtml,
                     }]);
                     setStatuses([{ step: "Report loaded successfully", state: "completed" }]);
                     setPhase("done");
                     collapse();
                 })
-                .catch(err => {
+                .catch((err) => {
                     console.error("Failed to fetch report:", err);
                     setErrors([{ error: "Failed to load report from server.", code: "FETCH_ERROR" }]);
                     setPhase("failed");
@@ -423,13 +471,13 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
             return;
         }
 
+        // ── Build mode: stream new report ─────────────────────────────────────
         setTemplateNames(req.selected_template_ids);
         setIsStreamClosed(false);
 
         const handler = new SSEBuildReportHandler(req as BuildReportRequest, {
             onStatus: (ev) => {
                 setStatuses((prev) => {
-                    // Update existing entry for same step+template or append
                     const idx = prev.findIndex(
                         (s) => s.step === ev.step && s.template_id === ev.template_id
                     );
@@ -441,32 +489,44 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                     return [...prev, ev];
                 });
             },
+
             onReport: (ev) => {
                 const newParts = extractHtmlParts(ev.output);
+                const { headerHtml, footerHtml } = extractLayout(ev.output);
+
                 setReports((prev) => {
                     const idx = prev.findIndex((r) => r.id === ev.id);
+
                     if (idx !== -1) {
+                        // Accumulate pages for this report as SSE events arrive
                         const next = [...prev];
-                        const updatedParts = [...(next[idx].htmlParts ?? []), ...newParts];
                         next[idx] = {
                             ...ev,
-                            htmlParts: updatedParts,
-                            htmlContent: combineReportHtmls(updatedParts),
+                            htmlPages: [...(next[idx].htmlPages ?? []), ...newParts],
+                            // Layout fields: only update when the new event provides them
+                            headerHtml: headerHtml || next[idx].headerHtml,
+                            footerHtml: footerHtml || next[idx].footerHtml,
                         };
                         return next;
                     }
+
+                    // First event for this report — create the entry
                     return [...prev, {
                         ...ev,
-                        htmlParts: newParts,
-                        htmlContent: combineReportHtmls(newParts),
+                        htmlPages: newParts,
+                        headerHtml,
+                        footerHtml,
                     }];
                 });
+
                 setPhase("done");
                 collapse();
             },
+
             onError: (ev) => {
                 setErrors((prev) => [...prev, ev]);
             },
+
             onEnd: (payload) => {
                 setIsStreamClosed(true);
                 if (payload.status === "failed") {
@@ -478,13 +538,11 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
         sseRef.current = handler;
         handler.start();
 
-        return () => {
-            sseRef.current?.abort();
-        };
+        return () => { sseRef.current?.abort(); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // ── Chat submit ──────────────────────────────────────────────────────────
+    // ── Chat submit ───────────────────────────────────────────────────────────
     const handleChatSubmit = useCallback(
         async (message: PromptInputMessage) => {
             if (!chatStore) return;
@@ -500,9 +558,7 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
         [chatStore, sessionId]
     );
 
-    const handleOpenChat = () => {
-        setChatOpen(true);
-    };
+    const handleOpenChat = () => setChatOpen(true);
 
     const handleCloseChat = () => {
         setIsClosingChat(true);
@@ -510,13 +566,17 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
         setTimeout(() => setIsClosingChat(false), ANIMATION_DURATION + 50);
     };
 
-    // ── Current report HTML ──────────────────────────────────────────────────
-    const activeReport = reports[activeReportIndex];
-    const activeHtml = activeReport?.htmlContent || "";
-    const activeTitle =
-        activeReport?.template_name || activeReport?.template_id || "Report";
+    // ── Active report derivation ───────────────────────────────────────────────
+    const activeReport    = reports[activeReportIndex];
+    const activeHtmlPages = activeReport?.htmlPages  ?? [];
+    const activeHeaderHtml = activeReport?.headerHtml ?? "";
+    const activeFooterHtml = activeReport?.footerHtml ?? "";
+    const activeTitle     = activeReport?.template_name || activeReport?.template_id || "Report";
 
-    // ── Report preview panel ────────────────────────────────────────────────
+    // Plain joined string — only for copy/download in WebPreviewControls, never for rendering
+    const activeHtmlForControls = activeHtmlPages.join("\n");
+
+    // ── Report preview panel ──────────────────────────────────────────────────
     const reportPanel = (
         <div className="flex flex-col h-full">
             <ReportTabBar
@@ -527,23 +587,35 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
             <WebPreview style={{ flex: 1, minHeight: 0 }}>
                 <WebPreviewControls
                     title={activeTitle}
-                    htmlContent={activeHtml}
+                    // Controls uses this only for copy/download — not for rendering
+                    htmlContent={activeHtmlForControls}
                     mode={previewMode}
                     onModeChange={handleModeChange}
                     orientation={pageOrientation}
                     onOrientationChange={setPageOrientation}
                     getPreviewIframe={getPreviewIframe}
+                    // Zoom controls
+                    userScale={userScale}
+                    onUserScaleChange={setUserScale}
+                    fitScale={fitScale}
+                    totalPageCount={totalPageCount}
                 />
                 <div className="relative flex-1 min-h-0">
                     <WebPreviewBody
-                        htmlContent={activeHtml}
-                        editMode={previewMode === "edit"}
+                        // New API — individual pages, header/footer from layout field
+                        htmlPages={activeHtmlPages}
+                        headerHtml={activeHeaderHtml}
+                        footerHtml={activeFooterHtml}
                         orientation={pageOrientation}
-                        onEditModeReady={handleEditModeReady}
-                        onIframeRef={handlePreviewIframeRef}
+                        userScale={userScale}
+                        onTotalPageCount={setTotalPageCount}
+                        onFitScaleChange={setFitScale}
+                        onIframeRef={handleIframeRef}
                         streamingStatusText={streamingStatusText}
                         className="h-full"
                     />
+
+                    {/* Stream still open indicator */}
                     {!isStreamClosed && reports.length > 0 && (
                         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 text-xs text-slate-600 bg-white/90 border border-slate-200 rounded-full px-3 py-1 shadow-sm">
                             <span className="w-3 h-3 rounded-full border-2 border-[#4c35c9]/30 border-t-[#4c35c9] animate-spin" />
@@ -555,14 +627,11 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
         </div>
     );
 
-    // ── Chat panel content ──────────────────────────────────────────────────
+    // ── Chat panel ────────────────────────────────────────────────────────────
     const chatPanelContent = (
         <div className="flex flex-col h-full border-l border-border bg-background">
-            {/* header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-                <span className="text-xs font-semibold text-slate-700">
-                    Chat Assistant
-                </span>
+                <span className="text-xs font-semibold text-slate-700">Chat Assistant</span>
                 <button
                     onClick={handleCloseChat}
                     className="w-6 h-6 flex items-center justify-center rounded hover:bg-slate-100 text-slate-500"
@@ -571,7 +640,6 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                 </button>
             </div>
 
-            {/* messages */}
             <div className="flex-1 overflow-hidden">
                 <Conversation className="w-full h-full overflow-y-auto custom-scrollbar">
                     <ConversationContent className="max-w-2xl mx-auto">
@@ -587,11 +655,11 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                                     key={chatId}
                                     chatId={chatId}
                                     onCopy={(c) => navigator.clipboard.writeText(c)}
-                                    onRetry={() => { }}
-                                    onLike={() => { }}
-                                    onDislike={() => { }}
-                                    onPreviewClick={() => { }}
-                                    onReportOutputUpdate={() => { }}
+                                    onRetry={() => {}}
+                                    onLike={() => {}}
+                                    onDislike={() => {}}
+                                    onPreviewClick={() => {}}
+                                    onReportOutputUpdate={() => {}}
                                     activeReportId={null}
                                 />
                             ))
@@ -601,28 +669,29 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                 </Conversation>
             </div>
 
-            {/* input */}
             <div className="shrink-0 p-3 pt-0">
                 <ChatInputPill onSubmit={handleChatSubmit} placeholder="Ask anything…" />
             </div>
         </div>
     );
 
-    // ── Right panel: EditPanel in edit mode, Chat panel otherwise ────────────
-    const rightPanelContent = previewMode === "edit" ? (
-        <EditPanel
-            selectedElement={selectedElement}
-            onUpdate={handlePropertyUpdate}
-            onReset={handleResetElement}
-            onClose={handleCloseEditPanel}
-        />
-    ) : chatPanelContent;
+    // ── Right panel: EditPanel or Chat ────────────────────────────────────────
+    const rightPanelContent =
+        previewMode === "edit" ? (
+            <EditPanel
+                selectedElement={selectedElement}
+                onUpdate={handlePropertyUpdate}
+                onReset={handleResetElement}
+                onClose={handleCloseEditPanel}
+            />
+        ) : (
+            chatPanelContent
+        );
 
-    // Right panel is visible when: edit mode is active OR chat is open/closing
     const chatVisible = chatOpen || isClosingChat;
     const rightPanelVisible = previewMode === "edit" || chatVisible;
 
-    // ── Render ───────────────────────────────────────────────────────────────
+    // ── Render ────────────────────────────────────────────────────────────────
     if (phase === "failed" && reports.length === 0) {
         return (
             <div className="w-full h-full bg-white">
@@ -638,9 +707,7 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
     return (
         <div className="flex h-full overflow-hidden relative">
 
-            {/* ── [Report left] | [EditPanel or Chat right] ───────────────────── */}
             {useResizablePanels && rightPanelVisible ? (
-                // Resizable panels once animation settles
                 <PanelGroup direction="horizontal" className="h-full w-full">
                     <Panel defaultSize={70} minSize={40} maxSize={85} className="flex flex-col">
                         {reportPanel}
@@ -651,7 +718,6 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                     </Panel>
                 </PanelGroup>
             ) : (
-                // CSS transition layout (initial open/close animation)
                 <>
                     <div
                         className={cn(
@@ -665,7 +731,6 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                         <div
                             className={cn(
                                 "w-[30%] transition-all duration-300 ease-in-out",
-                                // Slide-out animation only when chat is closing (not edit mode toggle)
                                 isClosingChat && previewMode !== "edit"
                                     ? "translate-x-full opacity-0"
                                     : "translate-x-0 opacity-100"
@@ -677,7 +742,7 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                 </>
             )}
 
-            {/* ── Floating chat button (only in view mode, chat closed) ────────── */}
+            {/* Floating chat button */}
             {!chatOpen && previewMode === "view" && phase === "done" && (
                 <button
                     onClick={handleOpenChat}
@@ -685,16 +750,7 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                     className="absolute bottom-5 right-5 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-white shadow-lg transition-all hover:scale-105 active:scale-95 overflow-hidden"
                 >
                     <span className="relative flex items-center justify-center w-full h-full rounded-full bg-white">
-                        <img
-                            src="/dotz-icon-bg.svg"
-                            alt="Dotz"
-                            className="w-full h-full"
-                        />
-                        {/* <img
-                            src="/ai-assistant-bubble-animation.gif"
-                            alt="Assistant"
-                            className="absolute w-full h-full bg-transparent"
-                        /> */}
+                        <img src="/dotz-icon-bg.svg" alt="Dotz" className="w-full h-full" />
                     </span>
                 </button>
             )}
@@ -703,16 +759,16 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
 }
 
 // ─── Page (provides ChatStore) ────────────────────────────────────────────────
+
 export default function BuildReportPage() {
     const [sessionId] = useState(() => {
-        // Try to get session_id from the stored request
         try {
             const raw = sessionStorage.getItem(STORAGE_KEY);
             if (raw) {
                 const req = JSON.parse(raw);
                 return req.session_id || uuidv4();
             }
-        } catch { }
+        } catch {}
         return uuidv4();
     });
 

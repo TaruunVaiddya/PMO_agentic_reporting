@@ -1,27 +1,111 @@
-"use client";
+'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+/**
+ * paginated-base-layout.tsx
+ *
+ * The single layout component shared by A4PortraitLayout and A4LandscapeLayout.
+ * Orientation is passed as a prop — the two wrappers are thin pass-throughs.
+ *
+ * Responsibilities
+ * ────────────────
+ * • Calls usePaginatedReport() to generate the iframe srcdoc.
+ * • Renders the iframe with the generated srcdoc.
+ * • Shows loading states: skeleton (no content), progress bar (paginating),
+ *   page-count badge (complete).
+ * • Forwards userScale changes to the live iframe via postMessage without
+ *   regenerating the srcdoc.
+ * • Re-sends userScale once after each pagination cycle completes
+ *   (the iframe reloads when srcdoc changes, resetting its internal state).
+ * • Exposes the iframe element via onIframeRef for the parent to call
+ *   iframe.contentWindow.print() for print support.
+ *
+ * Iframe ref strategy
+ * ───────────────────
+ * We need the iframe DOM element both for:
+ *   a) Passing to usePaginatedReport so it can postMessage userScale.
+ *   b) Exposing via onIframeRef for print.
+ *
+ * useRef alone won't work because ref.current changes don't trigger re-renders,
+ * so the hook would never see the mounted element. Instead we use a ref-callback
+ * that calls setState — state change triggers a re-render, the hook gets the
+ * element, and the SET_USER_SCALE postMessage fires correctly.
+ */
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { useWebPreview } from '../viewer-provider';
 import { usePaginatedReport } from '../pagination/pagination-engine';
-import { ReportLayoutProps } from './original-layout';
+import type { PaginationMessage } from '../pagination/pagination-engine';
 
-export interface PaginatedLayoutProps extends ReportLayoutProps {
+// ─── Props ────────────────────────────────────────────────────────────────────
+
+export interface PaginatedLayoutProps {
+  /**
+   * One HTML string per source report page.
+   * Each string is a full or partial HTML document — NOT pre-combined.
+   * The engine processes them sequentially and maintains style isolation.
+   */
+  htmlPages?: string[];
+
+  /**
+   * From layout.header — injected verbatim into every A4 page's header slot.
+   * Empty string / undefined = no header.
+   */
+  headerHtml?: string;
+
+  /**
+   * From layout.footer — injected verbatim into every A4 page's footer slot.
+   * Empty string / undefined = no footer.
+   */
+  footerHtml?: string;
+
+  /** 'portrait' = 210×297mm  |  'landscape' = 297×210mm */
   orientation: 'portrait' | 'landscape';
+
+  /**
+   * User zoom multiplier (from toolbar).  Default = 1.0.
+   * Forwarded to the iframe via postMessage — does NOT regenerate the srcdoc.
+   * Range: 0.5 – 2.0 recommended.
+   */
+  userScale?: number;
+
+  /** Called once pagination is fully complete with the total A4 page count. */
+  onTotalPageCount?: (count: number) => void;
+
+  /**
+   * Called whenever the iframe recomputes its fit-scale (viewer resize).
+   * Useful for displaying the current zoom level in a toolbar.
+   */
+  onFitScaleChange?: (scale: number) => void;
+
+  /**
+   * Called with the iframe element after it mounts (and again with null on unmount).
+   * Use this ref to call iframe.contentWindow?.print() for print support.
+   */
+  onIframeRef?: (iframe: HTMLIFrameElement | null) => void;
+
+  /** Status text shown in the loading pill while no pages have arrived yet. */
+  streamingStatusText?: string;
+
+  className?: string;
 }
 
-// ─── Loading skeleton: mimics a report page structure ────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
+/**
+ * Full-page A4 skeleton — shown while waiting for the first htmlPages content.
+ * Mimics the structure of a report page with shimmer animation.
+ */
 const PageSkeleton: React.FC<{ widthMm: number; heightMm: number }> = ({ widthMm, heightMm }) => (
   <div
-    className="bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] border border-slate-200 overflow-hidden relative flex flex-col px-12 py-10 gap-4"
-    style={{ width: `${widthMm}mm`, height: `${heightMm}mm`, minHeight: `${heightMm}mm` }}
+    className="bg-white shadow-[0_4px_20px_rgba(0,0,0,0.25)] overflow-hidden relative flex flex-col px-12 py-10 gap-4 flex-shrink-0"
+    style={{ width: `${widthMm}mm`, minHeight: `${heightMm}mm` }}
   >
     {/* Shimmer sweep */}
     <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
       <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.6s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
     </div>
 
+    {/* Report-like skeleton blocks */}
     <div className="h-6 w-2/5 rounded bg-slate-200" />
     <div className="h-3 w-1/4 rounded bg-slate-100 -mt-2" />
     <div className="border-t border-slate-100 my-1" />
@@ -55,169 +139,185 @@ const PageSkeleton: React.FC<{ widthMm: number; heightMm: number }> = ({ widthMm
   </div>
 );
 
-// ─── Indeterminate top progress bar ──────────────────────────────────────────
-
+/**
+ * Indeterminate top loading bar + optional floating status pill.
+ * The bar is always shown; the pill only appears when `label` is provided.
+ */
 const TopLoadingBar: React.FC<{ label?: string }> = ({ label }) => (
   <>
-    <div className="absolute top-0 left-0 right-0 z-30 h-[3px] bg-blue-800/10 overflow-hidden">
-      <div className="absolute h-full w-1/2 bg-blue-900 rounded-full animate-[indeterminate_1.4s_ease-in-out_infinite]" />
+    <div className="absolute top-0 left-0 right-0 z-30 h-[3px] bg-primary/10 overflow-hidden">
+      <div className="absolute h-full w-1/2 bg-primary rounded-full animate-[indeterminate_1.4s_ease-in-out_infinite]" />
     </div>
 
     {label && (
       <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-background/90 backdrop-blur-sm border border-border rounded-full shadow-sm pointer-events-auto">
-          <div className="w-2 h-2 rounded-full bg-blue-900 animate-pulse" />
-          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">{label}</span>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-background/90 backdrop-blur-sm border border-border rounded-full shadow-sm">
+          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+            {label}
+          </span>
         </div>
       </div>
     )}
   </>
 );
 
-// ─── Layout ───────────────────────────────────────────────────────────────────
+/** Small spinner + label shown while paginating (content has arrived but not yet laid out). */
+const PaginationSpinner: React.FC<{ current: number; total: number }> = ({ current, total }) => (
+  <div className="absolute top-3 right-3 z-20 flex items-center gap-2 px-3 py-1.5 bg-background/90 backdrop-blur-sm border border-border rounded-full shadow-sm">
+    <div className="w-3 h-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+    <span className="text-xs text-muted-foreground">
+      {total > 1 ? `Formatting page ${current} of ${total}…` : 'Formatting report…'}
+    </span>
+  </div>
+);
+
+/** Page-count badge shown after pagination completes on multi-page reports. */
+const PageCountBadge: React.FC<{ count: number }> = ({ count }) => (
+  <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 px-2.5 py-1 bg-background/90 border border-border rounded-md shadow-sm">
+    <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+    <span className="text-xs font-medium text-muted-foreground">{count} pages</span>
+  </div>
+);
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export const PaginatedBaseLayout: React.FC<PaginatedLayoutProps> = ({
-  src,
-  htmlContent,
-  className,
-  editMode = false,
-  onEditModeReady,
-  enablePagination = true,
+  htmlPages,
+  headerHtml,
+  footerHtml,
   orientation,
-  onPaginationComplete,
+  userScale = 1,
+  onTotalPageCount,
+  onFitScaleChange,
   onIframeRef,
   streamingStatusText,
+  className,
 }) => {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const { setIsLoading } = useWebPreview();
-  const [iframeSrcDoc, setIframeSrcDoc] = useState<string>('');
-  const editModeAppliedRef = useRef(false);
+  // ── Iframe element via state (not useRef) so hook re-renders on mount ────────
+  // useRef changes don't trigger re-renders, meaning usePaginatedReport would
+  // never receive the element and SET_USER_SCALE would never fire.
+  // A ref-callback that calls setState solves this cleanly.
+  const [iframeEl, setIframeEl] = useState<HTMLIFrameElement | null>(null);
 
-  // Page dimensions only — no style injection, no contentScale
-  const paginationConfig = React.useMemo(() => (
-    orientation === 'landscape'
-      ? { pageWidthMm: 297, pageHeightMm: 210, contentScale: 0.85 }
-      : { pageWidthMm: 210, pageHeightMm: 297 }
-  ), [orientation]);
+  const iframeRefCallback = useCallback((el: HTMLIFrameElement | null) => {
+    setIframeEl(el);
+    onIframeRef?.(el);
+  }, [onIframeRef]);
 
-  const { paginatedHtml, isPaginating, pageCount, wasPaginated } = usePaginatedReport(
-    htmlContent,
-    { enabled: enablePagination && !src, config: paginationConfig },
-  );
+  // ── Pagination hook ──────────────────────────────────────────────────────────
+  const {
+    iframeHtml,
+    isPaginating,
+    progress,
+    totalPageCount,
+    fitScale,
+  } = usePaginatedReport(htmlPages, {
+    orientation,
+    headerHtml,
+    footerHtml,
+    userScale,
+    iframeElement: iframeEl,
+    // Landscape is shorter (210mm tall) so tighter margins preserve more
+    // content area. Portrait uses slightly more generous margins.
+    margins: orientation === 'landscape'
+      ? { topMm: 4, bottomMm: 4, leftMm: 8, rightMm: 8 }
+      : { topMm: 8, bottomMm: 8, leftMm: 12, rightMm: 12 },
+  });
 
-  // Notify parent when pagination finishes
+  // ── Surface state to parent ──────────────────────────────────────────────────
+  const prevTotalRef = useRef(0);
   useEffect(() => {
-    if (!isPaginating && pageCount > 0) onPaginationComplete?.(pageCount);
-  }, [isPaginating, pageCount, onPaginationComplete]);
-
-  // paginateReport returns self-contained iframe HTML — set it directly
-  useEffect(() => {
-    if (src) {
-      setIframeSrcDoc('');
-    } else if (paginatedHtml) {
-      setIframeSrcDoc(paginatedHtml);
-    } else if (htmlContent) {
-      setIframeSrcDoc(htmlContent);
+    if (totalPageCount > 0 && totalPageCount !== prevTotalRef.current) {
+      prevTotalRef.current = totalPageCount;
+      onTotalPageCount?.(totalPageCount);
     }
-  }, [paginatedHtml, htmlContent, src]);
+  }, [totalPageCount, onTotalPageCount]);
 
-  // Edit mode: wait for pagination to finish before handing off the iframe
   useEffect(() => {
-    if (!iframeRef.current) return;
-    const iframe = iframeRef.current;
+    onFitScaleChange?.(fitScale);
+  }, [fitScale, onFitScaleChange]);
 
-    if (editMode && !editModeAppliedRef.current) {
-      let attempts = 0;
-      const maxAttempts = 50;
+  // ── Re-send userScale after pagination completes ─────────────────────────────
+  // When srcdoc changes (new pages), the iframe reloads and loses its internal
+  // userScale state. The hook sends SET_USER_SCALE when iframeElement changes, but
+  // the iframe may not be ready to receive messages until pagination is done.
+  // Sending once more on completion ensures the correct scale is always applied.
+  const prevIsPaginating = useRef(false);
+  useEffect(() => {
+    const justFinished = prevIsPaginating.current && !isPaginating;
+    prevIsPaginating.current = isPaginating;
 
-      const tryEnableEditMode = () => {
-        attempts++;
-        const iframeDoc = iframe.contentDocument;
-        const iframeWin = iframe.contentWindow as any;
-
-        if (!iframeDoc || iframeDoc.readyState !== 'complete') {
-          if (attempts < maxAttempts) setTimeout(tryEnableEditMode, 100);
-          return;
-        }
-
-        const hasPagination = !!iframeDoc.querySelector('.pages-container');
-        if (hasPagination && !iframeWin?.__paginationComplete) {
-          if (attempts < maxAttempts) setTimeout(tryEnableEditMode, 100);
-          return;
-        }
-
-        onEditModeReady?.(iframe);
-        editModeAppliedRef.current = true;
-      };
-
-      tryEnableEditMode();
-    } else if (!editMode && editModeAppliedRef.current) {
-      editModeAppliedRef.current = false;
+    if (justFinished && iframeEl?.contentWindow && userScale !== 1) {
+      const msg: PaginationMessage = { type: 'SET_USER_SCALE', scale: userScale };
+      iframeEl.contentWindow.postMessage(msg, '*');
     }
-  }, [editMode, iframeSrcDoc, onEditModeReady]);
+  }, [isPaginating, iframeEl, userScale]);
 
-  // Reset edit mode flag when source content changes
-  useEffect(() => {
-    editModeAppliedRef.current = false;
-  }, [htmlContent, src]);
+  // ── Derived display state ────────────────────────────────────────────────────
+  const hasPages     = (htmlPages?.length ?? 0) > 0;
+  const showSkeleton = !hasPages;
+  const showProgress = hasPages && isPaginating;
+  const showBadge    = !isPaginating && totalPageCount > 1;
 
-  // Forward iframe ref to parent
-  useEffect(() => {
-    onIframeRef?.(iframeRef.current);
-  }, [iframeSrcDoc, onIframeRef]);
-
-  const hasContent           = !!(htmlContent || src);
-  const showEmptyPage        = !hasContent;
-  const showPaginationIndicator = isPaginating && hasContent;
-
-  const pageWidthMm  = orientation === 'landscape' ? 297 : 210;
-  const pageHeightMm = orientation === 'landscape' ? 210 : 297;
+  const pageWmm = orientation === 'landscape' ? 297 : 210;
+  const pageHmm = orientation === 'landscape' ? 210 : 297;
 
   return (
-    <div className={cn('flex-1 bg-black/40 overflow-hidden relative', className)}>
+    <div className={cn('flex-1 overflow-hidden relative bg-[#9a9a9a]', className)}>
 
-      {/* Progress bar — while waiting for content or while paginating */}
-      {(showEmptyPage || showPaginationIndicator) && (
-        <TopLoadingBar label={showEmptyPage ? (streamingStatusText ?? undefined) : 'Formatting report...'} />
+      {/* ── Top loading bar ── */}
+      {(showSkeleton || showProgress) && (
+        <TopLoadingBar
+          label={showSkeleton ? (streamingStatusText ?? undefined) : undefined}
+        />
       )}
 
-      {/* Empty state: A4-shaped skeleton shimmer */}
-      {showEmptyPage && (
+      {/* ── Empty skeleton — shown while no pages have arrived ── */}
+      {showSkeleton && (
         <div className="absolute inset-0 z-10 flex items-start justify-center overflow-auto p-5">
-          <div className="flex flex-col items-center gap-5 min-h-full">
-            <PageSkeleton widthMm={pageWidthMm} heightMm={pageHeightMm} />
-          </div>
+          <PageSkeleton widthMm={pageWmm} heightMm={pageHmm} />
         </div>
       )}
 
-      {/* Pagination in-progress indicator (content is present but still being formatted) */}
-      {showPaginationIndicator && (
-        <div className="absolute top-4 right-3 z-20 flex items-center gap-2 px-3 py-1.5 bg-background/90 backdrop-blur-sm border border-border rounded-full shadow-sm">
-          <div className="w-3 h-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-          <span className="text-xs text-muted-foreground">Formatting report...</span>
-        </div>
+      {/* ── Pagination progress — shown while content is being laid out ── */}
+      {showProgress && (
+        <PaginationSpinner current={progress.current} total={progress.total} />
       )}
 
-      {/* Page count badge */}
-      {wasPaginated && pageCount > 1 && !isPaginating && (
-        <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 px-2.5 py-1 bg-background/90 border border-border rounded-md shadow-sm">
-          <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span className="text-xs font-medium text-muted-foreground">{pageCount} pages</span>
-        </div>
-      )}
+      {/* ── Page count badge — shown after complete on multi-page reports ── */}
+      {showBadge && <PageCountBadge count={totalPageCount} />}
 
+      {/*
+       * ── Iframe ──
+       *
+       * • srcdoc is the full self-contained HTML generated by paginateReport().
+       *   It includes all CSS, the pagination JS, and the source page data.
+       * • sandbox allows scripts and same-origin access (needed for postMessage
+       *   and for Chart.js / inline scripts to run).
+       * • The iframe is always in the DOM (opacity-0 when empty) — mounting /
+       *   unmounting would reset the iframe contentWindow and break messaging.
+       * • We do NOT add extra isolation styles here — paginateReport() already
+       *   generates a complete, self-contained document.
+       */}
       <iframe
-        ref={iframeRef}
-        src={src}
-        srcDoc={iframeSrcDoc || undefined}
-        className={cn('w-full h-full border-0', !hasContent && 'opacity-0')}
+        ref={iframeRefCallback}
+        srcDoc={iframeHtml || undefined}
+        className={cn(
+          'w-full h-full border-0 block',
+          // Keep in DOM but invisible until content is ready
+          !hasPages && 'opacity-0 pointer-events-none',
+        )}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-        onLoad={() => setIsLoading(false)}
-        title="Preview (Paginated)"
+        title={`Report preview (${orientation})`}
+        // Suppress onLoad flicker — pagination completion is driven by
+        // PAGINATION_COMPLETE postMessage, not the iframe load event.
       />
     </div>
   );
 };
+
+export default PaginatedBaseLayout;
