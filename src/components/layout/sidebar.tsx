@@ -4,17 +4,16 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import {
   Plus,
-  Search,
-  FileText,
   Layers,
-  Clock,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
-  MoreHorizontal,
   Settings,
   LogOut,
-  Brain
+  Brain,
+  Clock,
+  Sparkles,
+  CalendarCheck
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -82,7 +81,9 @@ export function AppSidebar({
 
   // Helper component for the navigation buttons to ensure consistency
   const NavButton = ({ icon: Icon, label, path, onClick }: any) => {
-    const isActive = pathname === path;
+    const isActive = Boolean(
+      path && (pathname === path || pathname.startsWith(`${path}/`))
+    )
     return (
       <button
         onClick={onClick || (() => path && router.push(path))}
@@ -137,9 +138,24 @@ export function AppSidebar({
       {/* Navigation Section */}
       <nav className="flex-1 px-3">
         <NavButton
-          icon={Layers}
-          label="Report Templates"
-          path="/report-templates"
+          icon={Sparkles}
+          label="Report Engine"
+          path="/pmo-intelligence/report-builder"
+        />
+        <NavButton
+          icon={Clock}
+          label="Automations"
+          path="/pmo-intelligence/automations"
+        />
+        <NavButton
+          icon={Brain}
+          label="Decision Hub"
+          path="/pmo-intelligence/decision-intelligence"
+        />
+        <NavButton
+          icon={CalendarCheck}
+          label="Meeting Prep"
+          path="/pmo-intelligence/meeting-prep"
         />
         <NavButton
           icon={Plus}
@@ -147,9 +163,9 @@ export function AppSidebar({
           path="/chat"
         />
         <NavButton
-          icon={Brain}
-          label="PMO Intelligence"
-          path="/pmo-intelligence"
+          icon={Layers}
+          label="Report Templates"
+          path="/report-templates"
         />
       </nav>
 
@@ -191,6 +207,3 @@ export function AppSidebar({
     </div>
   )
 }
-
-
-

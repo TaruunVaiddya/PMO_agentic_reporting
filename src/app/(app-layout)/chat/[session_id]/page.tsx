@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useContext } from 'react';
+import { usePathname } from 'next/navigation';
 import { ChatInputPill } from '@/components/chat/chat-input-pill';
 import ChatMessageItem from '@/components/chat/chat-message-item';
 import { PromptInputMessage } from '@/components/ai-elements/prompt-input';
@@ -67,9 +68,12 @@ const extractHtmlContent = (output: any): string => {
 
 export default function Page({ params }: ChatSessionPageProps) {
   const resolvedParams = React.use(params);
+  const pathname = usePathname();
   const chatStore = useContext(ChatProviderContext);
+  const skipInitialHistoryLoad = pathname.startsWith('/pmo-intelligence/decision-intelligence/');
 
   useEffect(() => {
+    if (skipInitialHistoryLoad) return;
     if (resolvedParams.session_id) {
       (async () => {
         try {
@@ -130,14 +134,18 @@ export default function Page({ params }: ChatSessionPageProps) {
       })();
     }
 
-  }, [resolvedParams.session_id]);
+  }, [resolvedParams.session_id, skipInitialHistoryLoad]);
 
   return (
-    <ChatSessionPage session_id={resolvedParams.session_id} chatStore={chatStore} />
+    <ChatSessionPage
+      session_id={resolvedParams.session_id}
+      chatStore={chatStore}
+      skipInitialHistoryLoad={skipInitialHistoryLoad}
+    />
   )
 }
 
-const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatStore }: { session_id: string, chatStore: ChatStoreType | null }) {
+const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatStore, skipInitialHistoryLoad }: { session_id: string, chatStore: ChatStoreType | null, skipInitialHistoryLoad?: boolean }) {
   const { collapse } = useSidebar();
   // Get all chat IDs for this session using the hook
   const allChatIds = useChatIds();
@@ -181,6 +189,12 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
 
   const [previewMode, setPreviewMode] = useState<PreviewMode>('view');
   const [pageOrientation, setPageOrientation] = useState<PageOrientation>('original');
+
+  React.useEffect(() => {
+    if (skipInitialHistoryLoad) {
+      collapse();
+    }
+  }, [skipInitialHistoryLoad, collapse]);
 
   // Handle mode change
   const handleModeChange = React.useCallback(

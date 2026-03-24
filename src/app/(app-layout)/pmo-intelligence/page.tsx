@@ -133,7 +133,7 @@ function PMOIntelligenceContent() {
                                     </div>
                                     <p className="text-slate-400 text-xs">Automated document synthesis and executive formatting.</p>
                                 </div>
-                                <Link href="/pmo-intelligence/report-editor">
+                                <Link href="/pmo-intelligence/report-builder">
                                     <button className="text-[#1a2456] text-[11px] font-bold flex items-center gap-1.5 hover:bg-slate-50 px-3 py-1.5 rounded border border-slate-100 transition-all">
                                         <Maximize2 className="h-3.5 w-3.5" /> Full Screen Editor
                                     </button>
