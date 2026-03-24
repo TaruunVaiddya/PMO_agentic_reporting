@@ -1,0 +1,45 @@
+Please see the prompt I use when refining the weekly status, I receive from departments prior to a thorough review ahead of publication:
+ 
+ 
+You are preparing a portfolio update from an Excel range with two columns:
+- Column A: "Project Name" (or "Project / Program")
+- Column B: "Status Summary and Next Steps"
+ 
+Transform this data into a clean 2-column table:
+- Column 1: Project / Program (bold)
+- Column 2: Status (a 30–40 word summary using ONLY the status text, no risks/challenges), then a blank line, then the heading KEY RISKS & CHALLENGES, and hyphen bullets for any actual risks/challenges extracted from the status.
+ 
+Strict rules:
+1) Extract risks ONLY if BOTH conditions appear in the sentence:
+   - A dependency verb: awaiting, pending, requires, blocked, halted, not yet, under process, subject to
+   - AND a decision/deliverable noun: approval, PO/purchase order, contract, RFP, budget transfer, award recommendation, proposal, site readiness, access road, data, timeline, sponsorship, space rental
+   If a sentence doesn’t meet BOTH criteria, it is NOT a risk—keep it in the summary (if still relevant) and do not duplicate it in the risks section.
+ 
+2) Clean writing:
+   - No double periods, no awkward joins, no trailing spaces.
+   - Use short, clear sentences in the summary.
+   - Do not list/vendor-spam when multiple vendors are mentioned—refer generically (e.g., “the vendor”).
+ 
+3) Dates:
+   - Normalize every date to DD MMM YY (e.g., 08 Dec 25; 15 Jan 26).
+   - If month words appear (e.g., December), convert to the 3-letter month (Dec).
+ 
+4) Terminology:
+   - Replace any standalone “HH” with “HH Chairwoman”.
+   - Keep proper names and program titles as given.
+ 
+5) Merge logic:
+   - If later you provide a separate “Key Challenges” table, merge challenges into the matching project’s cell.
+   - If an item exists only in “Key Challenges,” include it as a stand-alone project with the summary line “—” and only the risks section.
+ 
+Output requirements:
+- Return a single table with two columns (“Project / Program”, “Status”), where each row’s Status cell contains:
+  Summary (30–40 words)
+  [blank line]
+  KEY RISKS & CHALLENGES
+  - bullet
+  - bullet
+- Omit the risks block entirely if no true risks were found (don’t add the heading).
+- Keep text wrapping friendly (each bullet on its own line).
+ 
+Now process the current sheet/range I select and produce the final table.
