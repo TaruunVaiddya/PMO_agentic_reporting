@@ -3,8 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import {
-  Plus,
-  Layers,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
@@ -15,11 +13,8 @@ import {
   Sparkles,
   CalendarCheck
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { useSession } from '@/contexts/session-context'
 import { useSidebar } from '@/contexts/sidebar-context'
-import { postFetcher } from '@/lib/post-fetcher'
 import { toast } from 'sonner'
 import { fetchWithAuth } from '@/lib/fetch-with-auth'
 
@@ -42,8 +37,6 @@ export function AppSidebar({
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const collapseTimeout = useRef<NodeJS.Timeout | null>(null)
-
-  const { pendingQuery, setPendingQuery, newSessionId, setNewSessionId } = useSession()
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -156,16 +149,6 @@ export function AppSidebar({
           icon={CalendarCheck}
           label="Meeting Prep"
           path="/pmo-intelligence/meeting-prep"
-        />
-        <NavButton
-          icon={Plus}
-          label="Generate Report"
-          path="/chat"
-        />
-        <NavButton
-          icon={Layers}
-          label="Report Templates"
-          path="/report-templates"
         />
       </nav>
 
