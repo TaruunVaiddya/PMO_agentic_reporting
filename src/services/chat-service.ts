@@ -10,6 +10,7 @@ export interface ChatServiceConfig {
   collection_id?: string | null;
   metadata?: Record<string, any> | null;
   template_id?: string | null;
+  endpointPath?: string;
 }
 
 export default class SSEChatHandler {
@@ -30,6 +31,7 @@ export default class SSEChatHandler {
   private collection_id: string | null;
   private metadata: Record<string, any> | null;
   private template_id: string | null;
+  private endpointPath: string;
 
   constructor(config: ChatServiceConfig) {
     this.chatStore = config.chatStore;
@@ -40,6 +42,7 @@ export default class SSEChatHandler {
     this.collection_id = config.collection_id || null;
     this.metadata = config.metadata || null;
     this.template_id = config.template_id || null;
+    this.endpointPath = config.endpointPath || '/report-assistant';
   }
 
   private getId(): string {
@@ -66,7 +69,7 @@ export default class SSEChatHandler {
         template_id: this.template_id,
       };
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/report-assistant`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${this.endpointPath}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -384,6 +384,8 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
       return;
     }
 
+    const endpointPath = skipInitialHistoryLoad ? '/pmo-chat' : '/report-assistant';
+
     try {
       // Create SSE handler with the config object
       const sseHandler = new SSEChatHandler({
@@ -392,6 +394,7 @@ const ChatSessionPage = React.memo(function ChatSessionPage({ session_id, chatSt
         sessionId: session_id,
         selected_agent: message.mode,
         template_id: message.template_id,
+        endpointPath,
       });
 
       // Start the chat (SSE handler will update the store)

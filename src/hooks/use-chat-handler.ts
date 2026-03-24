@@ -12,7 +12,11 @@ export const useChatHandler = () => {
     const chatStore = useContext(ChatProviderContext);
     const { setPendingQuery, setNewSessionId } = useSession();
 
-    const handleStartChat = async (message: PromptInputMessage, customPathBase?: string) => {
+    const handleStartChat = async (
+        message: PromptInputMessage,
+        customPathBase?: string,
+        endpointPath?: string
+    ) => {
         if (!chatStore) {
             console.error('Chat store not available');
             return;
@@ -43,6 +47,7 @@ export const useChatHandler = () => {
                 is_new_chat: true,
                 collection_id: message.collection_id,
                 template_id: message.template_id,
+                endpointPath,
             });
 
             // Start the chat

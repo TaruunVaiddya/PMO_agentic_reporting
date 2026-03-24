@@ -361,6 +361,7 @@ export function ReportBuilderSession({
                 sessionId: session_id,
                 selected_agent: message.mode,
                 template_id: message.template_id,
+                endpointPath: '/chat',
             });
             sseHandler.startChat();
         } catch (error) {
