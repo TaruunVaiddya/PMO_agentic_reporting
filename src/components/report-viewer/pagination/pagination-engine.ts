@@ -158,7 +158,7 @@ function buildIframeCSS(
       inset: 0;
       overflow-y: auto;
       overflow-x: hidden;
-      background: #3a3a3a;
+      background: #9a9a9a;
       padding: var(--page-gap);
       box-sizing: border-box;
     }

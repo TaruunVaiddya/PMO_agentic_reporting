@@ -347,6 +347,9 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
     const [fitScale, setFitScale] = useState(1);
     const [totalPageCount, setTotalPageCount] = useState(0);
 
+    // Original view width — forwarded via postMessage (no srcdoc regen)
+    const [originalWidth, setOriginalWidth] = useState(1200);
+
     // Single iframe ref — set via onIframeRef, used for both edit mode and print
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -599,6 +602,9 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                     onUserScaleChange={setUserScale}
                     fitScale={fitScale}
                     totalPageCount={totalPageCount}
+                    // Original view width
+                    originalWidth={originalWidth}
+                    onOriginalWidthChange={setOriginalWidth}
                 />
                 <div className="relative flex-1 min-h-0">
                     <WebPreviewBody
@@ -612,6 +618,7 @@ function BuildReportInner({ sessionId }: { sessionId: string }) {
                         onFitScaleChange={setFitScale}
                         onIframeRef={handleIframeRef}
                         streamingStatusText={streamingStatusText}
+                        originalWidth={originalWidth}
                         className="h-full"
                     />
 

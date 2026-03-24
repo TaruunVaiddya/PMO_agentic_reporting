@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import {
     RotateCcw, ExternalLink, X, Edit3, Eye,
-    Download, Loader2, ChevronDown, ZoomIn, ZoomOut,
+    Download, Loader2, ChevronDown, ZoomIn, ZoomOut, Save,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -18,8 +18,13 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { capturePdfFromIframe, printToPdf } from '@/lib/pdf-utils';
+import {
+    capturePdfFromIframe,
+    captureSinglePagePdfFromIframe,
+    printToPdf,
+} from '@/lib/pdf-utils';
 import { useWebPreview } from './viewer-provider';
+import { SaveTemplateModal } from '@/components/reports/save-template-modal';
 
 export type PreviewMode = 'view' | 'edit';
 export type PageOrientation = 'original' | 'portrait' | 'landscape';
@@ -182,6 +187,42 @@ const ZoomControls: React.FC<{
     );
 };
 
+
+// ─── Original view width control ──────────────────────────────────────────────
+
+const WIDTH_PRESETS = [
+  { label: 'S',    value: 600,  tooltip: 'Narrow (600px)' },
+  { label: 'M',    value: 900,  tooltip: 'Medium (900px)' },
+  { label: 'L',    value: 1200, tooltip: 'Wide (1200px)'  },
+  { label: 'Full', value: 0,    tooltip: 'Full width'     },
+];
+
+const WidthControls: React.FC<{
+    width: number;
+    onChange: (w: number) => void;
+}> = ({ width, onChange }) => (
+    <div className="flex items-center gap-0.5 bg-muted/50 rounded-md border border-border px-1 h-9">
+        {WIDTH_PRESETS.map((p) => (
+            <Tooltip key={p.value}>
+                <TooltipTrigger asChild>
+                    <button
+                        onClick={() => onChange(p.value)}
+                        className={cn(
+                            'px-2 h-7 rounded text-xs font-medium transition-colors',
+                            width === p.value
+                                ? 'bg-background shadow-sm text-foreground'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+                        )}
+                    >
+                        {p.label}
+                    </button>
+                </TooltipTrigger>
+                <TooltipContent><p>{p.tooltip}</p></TooltipContent>
+            </Tooltip>
+        ))}
+    </div>
+);
+
 // ─── Main controls ────────────────────────────────────────────────────────────
 
 interface WebPreviewControlsProps {
@@ -211,6 +252,11 @@ interface WebPreviewControlsProps {
     fitScale?: number;
     /** Total A4 page count — shown as a small badge next to the title. */
     totalPageCount?: number;
+
+    // ── Original view width ───────────────────────────────────────────────
+    /** Current content wrapper width in px (original view only). Default 900. */
+    originalWidth?: number;
+    onOriginalWidthChange?: (width: number) => void;
 }
 
 export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
@@ -227,11 +273,15 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
     onUserScaleChange,
     fitScale = 1,
     totalPageCount,
+    originalWidth = 900,
+    onOriginalWidthChange,
 }) => {
     const [isDownloading, setIsDownloading] = useState(false);
+    const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
 
     const isPaginated = orientation !== 'original';
     const showZoom    = isPaginated && !!onUserScaleChange;
+    const showWidth   = !isPaginated && !!onOriginalWidthChange;
 
     const handleOpenInNewTab = () => {
         const blob = new Blob([htmlContent], { type: 'text/html' });
@@ -247,7 +297,13 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
             const previewIframe  = getPreviewIframe?.();
             const pdfOrientation = orientation === 'landscape' ? 'landscape' : 'portrait';
 
-            if (previewIframe?.contentDocument) {
+            if (orientation === 'original') {
+                if (previewIframe?.contentDocument) {
+                    await captureSinglePagePdfFromIframe(previewIframe, title);
+                } else {
+                    await printToPdf(htmlContent, title, pdfOrientation);
+                }
+            } else if (previewIframe?.contentDocument) {
                 await capturePdfFromIframe(previewIframe, title, pdfOrientation);
             } else {
                 await printToPdf(htmlContent, title, pdfOrientation);
@@ -344,6 +400,14 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
                     />
                 )}
 
+                {/* Width controls — only for original view */}
+                {showWidth && (
+                    <WidthControls
+                        width={originalWidth}
+                        onChange={onOriginalWidthChange!}
+                    />
+                )}
+
                 {/* Download PDF */}
                 <WebPreviewNavigationButton
                     tooltip="Download PDF"
@@ -353,6 +417,14 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
                     {isDownloading
                         ? <Loader2 className="size-4 animate-spin text-primary" />
                         : <Download className="size-4" />}
+                </WebPreviewNavigationButton>
+
+                {/* Save as template */}
+                <WebPreviewNavigationButton
+                    tooltip="Save as template"
+                    onClick={() => setShowSaveTemplateModal(true)}
+                >
+                    <Save className="size-4" />
                 </WebPreviewNavigationButton>
 
                 {/* Open externally */}
@@ -370,6 +442,15 @@ export const WebPreviewControls: React.FC<WebPreviewControlsProps> = ({
                     </WebPreviewNavigationButton>
                 )}
             </div>
+
+            <SaveTemplateModal
+                open={showSaveTemplateModal}
+                onOpenChange={setShowSaveTemplateModal}
+                onSuccess={() => {}}
+                title={title}
+                getPreviewIframe={getPreviewIframe}
+                orientation={orientation}
+            />
         </div>
     );
 };

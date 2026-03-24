@@ -44,6 +44,10 @@ export interface WebPreviewBodyProps {
     htmlContent?: string;
     /** Optional URL — passed through to OriginalLayout if set. */
     src?: string;
+    /** Edit mode flag used by the original layout. */
+    editMode?: boolean;
+    /** Called when the original layout iframe is ready for edit-mode setup. */
+    onEditModeReady?: (iframe: HTMLIFrameElement) => void;
 
     // ── Shared ────────────────────────────────────────────────────────────
     orientation?: PageOrientation;
@@ -54,6 +58,8 @@ export interface WebPreviewBodyProps {
     onIframeRef?: (iframe: HTMLIFrameElement | null) => void;
     streamingStatusText?: string;
     className?: string;
+    /** Original view content wrapper width in px. 0 = full width. Default 900. */
+    originalWidth?: number;
 }
 
 export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
@@ -68,22 +74,26 @@ export const WebPreviewBody: React.FC<WebPreviewBodyProps> = ({
     // Original props
     htmlContent,
     src,
+    editMode,
+    onEditModeReady,
     // Shared
     onIframeRef,
     streamingStatusText,
     className,
+    originalWidth,
 }) => {
     if (orientation === 'original') {
-        // Derive htmlContent from htmlPages if not explicitly provided —
-        // ensures original view always renders even when only htmlPages are passed.
         const effectiveHtmlContent = htmlContent ?? htmlPages?.join('\n') ?? '';
         return (
             <OriginalLayout
                 htmlContent={effectiveHtmlContent}
                 src={src}
+                editMode={editMode}
+                onEditModeReady={onEditModeReady}
                 onIframeRef={onIframeRef}
                 streamingStatusText={streamingStatusText}
                 className={className}
+                originalWidth={originalWidth}
             />
         );
     }

@@ -41,6 +41,53 @@
  */
 
 export type PdfOrientation = 'portrait' | 'landscape';
+export type PreviewOrientation = 'original' | 'portrait' | 'landscape';
+
+const HTML2CANVAS_CDN =
+    'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+
+const ensureHtml2Canvas = async (iframeDoc: Document, iframeWindow: Window) => {
+    if ((iframeWindow as any).html2canvas) {
+        return (iframeWindow as any).html2canvas as typeof import('html2canvas').default;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+        const script = iframeDoc.createElement('script');
+        script.src = HTML2CANVAS_CDN;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Failed to load html2canvas'));
+        iframeDoc.head.appendChild(script);
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const html2canvasFn = (iframeWindow as any).html2canvas as typeof import('html2canvas').default | undefined;
+    if (!html2canvasFn) {
+        throw new Error('html2canvas not available in iframe');
+    }
+
+    return html2canvasFn;
+};
+
+const getOriginalPageElement = (iframeDoc: Document): HTMLElement => {
+    const body = iframeDoc.body;
+    if (!body) {
+        throw new Error('No content found to export');
+    }
+
+    return (iframeDoc.getElementById('__orig_wrap__') as HTMLElement | null) || body;
+};
+
+const canvasToFile = async (canvas: HTMLCanvasElement, filename: string): Promise<File> => {
+    const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((result) => {
+            if (result) resolve(result);
+            else reject(new Error('Failed to create image blob'));
+        }, 'image/png');
+    });
+
+    return new File([blob], filename, { type: 'image/png' });
+};
 
 export const capturePdfFromIframe = async (
     iframe: HTMLIFrameElement,
@@ -65,20 +112,7 @@ export const capturePdfFromIframe = async (
 
     const pdf = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
 
-    // Inject html2canvas into the iframe if not already present
-    if (!(iframeWindow as any).html2canvas) {
-        await new Promise<void>((resolve, reject) => {
-            const script   = iframeDoc.createElement('script');
-            script.src     = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-            script.onload  = () => resolve();
-            script.onerror = () => reject(new Error('Failed to load html2canvas'));
-            iframeDoc.head.appendChild(script);
-        });
-        await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    const iframeHtml2Canvas = (iframeWindow as any).html2canvas;
-    if (!iframeHtml2Canvas) throw new Error('html2canvas not available in iframe');
+    const iframeHtml2Canvas = await ensureHtml2Canvas(iframeDoc, iframeWindow);
 
     for (let i = 0; i < pages.length; i++) {
         const page = pages[i] as HTMLElement;
@@ -170,6 +204,134 @@ export const capturePdfFromIframe = async (
     }
 
     pdf.save(`${filename || 'report'}.pdf`);
+};
+
+export const captureSinglePagePdfFromIframe = async (
+    iframe: HTMLIFrameElement,
+    filename: string,
+) => {
+    const { default: jsPDF } = await import('jspdf');
+
+    const iframeDoc    = iframe.contentDocument;
+    const iframeWindow = iframe.contentWindow;
+    if (!iframeDoc || !iframeWindow) {
+        throw new Error('Cannot access iframe document');
+    }
+
+    const iframeHtml2Canvas = await ensureHtml2Canvas(iframeDoc, iframeWindow);
+    const captureElement = getOriginalPageElement(iframeDoc);
+    const rect = captureElement.getBoundingClientRect();
+    const width = Math.max(1, Math.ceil(rect.width || captureElement.scrollWidth || 0));
+    const height = Math.max(1, Math.ceil(rect.height || captureElement.scrollHeight || 0));
+
+    const canvas = await iframeHtml2Canvas(captureElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        scrollX: 0,
+        scrollY: 0,
+        x: 0,
+        y: 0,
+        width,
+        height,
+        windowWidth: width,
+        windowHeight: height,
+        onclone: (clonedDoc: Document) => {
+            const clonedBody = clonedDoc.body;
+            if (!clonedBody) return;
+
+            // Preserve the visible page card, but remove surrounding body space
+            // so the exported PDF matches the wrapper exactly.
+            clonedBody.style.margin = '0';
+            clonedBody.style.padding = '0';
+            clonedBody.style.maxWidth = 'none';
+            clonedBody.style.minHeight = '0';
+            clonedBody.style.boxShadow = 'none';
+            clonedBody.style.borderRadius = '0';
+            clonedBody.style.background = 'transparent';
+            clonedBody.style.overflow = 'visible';
+
+            const clonedWrap = clonedDoc.getElementById('__orig_wrap__') as HTMLElement | null;
+            if (clonedWrap) {
+                clonedWrap.style.margin = '0';
+                clonedWrap.style.maxWidth = 'none';
+            }
+        },
+    });
+
+    const pxToMm = 25.4 / 96;
+    const maxPdfDimMm = 5000;
+    const rawWidthMm = canvas.width * pxToMm;
+    const rawHeightMm = canvas.height * pxToMm;
+    const scale = Math.min(
+        1,
+        maxPdfDimMm / rawWidthMm,
+        maxPdfDimMm / rawHeightMm,
+    );
+    const pageWidthMm = rawWidthMm * scale;
+    const pageHeightMm = rawHeightMm * scale;
+
+    const pdf = new jsPDF({
+        orientation: pageWidthMm >= pageHeightMm ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: [pageWidthMm, pageHeightMm],
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    pdf.addImage(imgData, 'JPEG', 0, 0, pageWidthMm, pageHeightMm);
+    pdf.save(`${filename || 'report'}.pdf`);
+};
+
+export const capturePreviewThumbnailFromIframe = async (
+    iframe: HTMLIFrameElement,
+    filename: string,
+    orientation: PreviewOrientation = 'original',
+) => {
+    const iframeDoc = iframe.contentDocument;
+    const iframeWindow = iframe.contentWindow;
+    if (!iframeDoc || !iframeWindow) {
+        throw new Error('Cannot access iframe document');
+    }
+
+    const iframeHtml2Canvas = await ensureHtml2Canvas(iframeDoc, iframeWindow);
+
+    let captureElement: HTMLElement | null = null;
+    if (orientation === 'original') {
+        captureElement = getOriginalPageElement(iframeDoc);
+    } else {
+        captureElement = iframeDoc.querySelector('.a4-page') as HTMLElement | null;
+        if (!captureElement) {
+            captureElement = iframeDoc.body;
+        }
+    }
+
+    if (!captureElement) {
+        throw new Error('No content found to capture');
+    }
+
+    const rect = captureElement.getBoundingClientRect();
+    const width = Math.max(1, Math.ceil(rect.width || captureElement.scrollWidth || 0));
+    const height = Math.max(1, Math.ceil(rect.height || captureElement.scrollHeight || 0));
+
+    const canvas = await iframeHtml2Canvas(captureElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        scrollX: 0,
+        scrollY: 0,
+        x: 0,
+        y: 0,
+        width,
+        height,
+        windowWidth: width,
+        windowHeight: height,
+    });
+
+    return canvasToFile(canvas, `${filename || 'template'}.png`);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
