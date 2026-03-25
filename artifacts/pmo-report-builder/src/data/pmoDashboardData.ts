@@ -237,12 +237,12 @@ const SMART_BUILDINGS_REPORT = makeReport(
 );
 
 const BIOSEC_INTEL_REPORT = makeReport(
-  'Biosecurity Intelligence',
+  'Market Access Programme',
   'Rachel Kim',
   'Ashraf Clark',
-  'Biosecurity',
+  'Trade & Investment',
   'on-track',
-  'Intelligence platform v2 live across all border processing units. 14,000 risk assessments processed in Q1. Integration with all partner agency data feeds complete. Q2 expansion to air cargo screening approved by governance board.',
+  'Phase 2 platform live across all processing units. 14,000 assessments processed in Q1 — 23% increase on prior period. Integration with all partner agency data feeds complete. Phase 3 expansion scope approved by governance board.',
   '17/03/2026',
   {},
   [],
@@ -252,8 +252,8 @@ const BIOSEC_INTEL_REPORT = makeReport(
     { name: 'Q2 Air Cargo Scope Approval', priority: 'MP', dueDate: '31/03/2026', currentDueDate: '31/03/2026', status: 'Completed' },
   ],
   {},
-  'Platform v2 operational across all 8 border units. 14,000 risk assessments processed — 23% increase on Q4 2025. Partner agency data feeds fully integrated. 98.9% platform uptime recorded.',
-  'Expand to air cargo screening. Integrate real-time vessel manifest data. Commence Phase 3 predictive analytics scoping.',
+  'Phase 2 platform operational across all processing units. 14,000 assessments processed — 23% increase on Q4 2025. Partner agency data feeds fully integrated. 98.9% platform uptime recorded.',
+  'Expand Phase 3 to remaining processing units. Integrate real-time data feeds. Commence predictive analytics scoping.',
 );
 
 export const BASE_PMO_PROJECTS: DashboardProject[] = [
@@ -262,7 +262,7 @@ export const BASE_PMO_PROJECTS: DashboardProject[] = [
     name: 'New Global Initiative',
     projectManager: 'Sarah Mitchell',
     projectDirector: 'Ashraf Clark',
-    businessUnit: 'Biosecurity',
+    businessUnit: 'Trade & Investment',
     program: 'Trade & Growth Portfolio',
     reportingStatus: 'clicked',
     notifiedAt: '10/03/2026',
@@ -398,10 +398,10 @@ export const BASE_PMO_PROJECTS: DashboardProject[] = [
   },
   {
     id: 'proj-11',
-    name: 'Biosecurity Intelligence',
+    name: 'Market Access Programme',
     projectManager: 'Rachel Kim',
     projectDirector: 'Ashraf Clark',
-    businessUnit: 'Biosecurity',
+    businessUnit: 'Trade & Investment',
     program: 'Trade & Growth Portfolio',
     reportingStatus: 'approved',
     notifiedAt: '10/03/2026',
@@ -461,8 +461,8 @@ export const EXEC_SUMMARY_ROWS = [
     risks: ['Site access road completion awaiting contract award from Roads Authority — expected 30 Apr 26.'],
   },
   {
-    project: 'Biosecurity Intelligence',
-    summary: 'Intelligence platform v2 live across all border processing units. 14,000 risk assessments processed in Q1 — 23% increase on Q4 2025. Agency data feed integrations complete. Q2 expansion to air cargo screening approved.',
+    project: 'Market Access Programme',
+    summary: 'Phase 2 platform live across all processing units. 14,000 assessments processed in Q1 — 23% increase on Q4 2025. All partner agency data feed integrations complete. Phase 3 expansion scope approved by governance board.',
     risks: [],
   },
   {

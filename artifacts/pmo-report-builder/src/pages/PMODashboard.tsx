@@ -55,7 +55,7 @@ const TEMPLATE_META: Record<SummaryTemplate, { label: string; usageCount: number
 const PORTFOLIO_GROUPS = [
   { key: 'digital-uplift', label: 'Digital Uplift Portfolio', snapTag: 'Digital Uplift', snapContextTag: 'Digital Uplift', color: '#0891b2', bg: '#e0f9ff', border: '#a5f3fc', pct: 75, projectCount: 4 },
   { key: 'infrastructure', label: 'Infrastructure Delivery', snapTag: 'Infrastructure', snapContextTag: 'Infrastructure', color: '#4f46e5', bg: '#f0f4ff', border: '#c7d2fe', pct: 100, projectCount: 2 },
-  { key: 'trade-corp', label: 'Trade, Corporate & Biosecurity', snapTag: 'Trade & Corporate', snapContextTag: 'Trade & Corp', color: '#065f46', bg: '#ecfdf5', border: '#6ee7b7', pct: 67, projectCount: 4 },
+  { key: 'trade-corp', label: 'Trade & Investment', snapTag: 'Trade & Investment', snapContextTag: 'Trade & Inv', color: '#065f46', bg: '#ecfdf5', border: '#6ee7b7', pct: 67, projectCount: 4 },
 ];
 const PORTFOLIO_CONTEXT: Record<string, string> = {
   'digital-uplift': 'Strong delivery across ESS and Cyber Resilience with both programmes meeting March milestones. Data Governance classification tooling gated on legal MOU review — outcome 15 Apr will unblock deployment.',
@@ -333,7 +333,7 @@ function BUHeadContent({ rows, selectedGroups }: { rows: typeof EXEC_SUMMARY_ROW
     },
     {
       key: 'trade-corp',
-      name: 'Trade, Corporate & Biosecurity',
+      name: 'Trade & Investment',
       color: '#065f46',
       bgColor: '#ecfdf5',
       projects: [
