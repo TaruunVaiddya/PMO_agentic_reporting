@@ -137,7 +137,11 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
       );
       await delay(1200);
       addMsg('assistant',
-        `You're submitting the Project Status Report for:\n\nEnterprise Security Services (ESS)\nReporting period: 01 March 2026 – 31 March 2026\n\nI've loaded your last three reports on the right for reference. When you're ready, give me a brain dump of everything that happened this quarter — milestones, budget, risks, issues, wins. Don't worry about structure, I will handle that.`
+        `You're submitting the Project Status Report for:\n\nEnterprise Security Services (ESS)\nReporting period: 01 March 2026 – 31 March 2026\n\nI've loaded your last three reports on the right for reference.`
+      );
+      await delay(1200);
+      addMsg('assistant',
+        `When you're ready, give me a brain dump of everything that happened this quarter — milestones, budget, risks, issues, wins.\n\nDon't worry about structure, I will handle that.`
       );
       setStage('memory_dump');
     })();
