@@ -200,9 +200,9 @@ export const PROJECTS: Project[] = [
     name: 'New Global Initiative',
     currentReport: blankReport,
     pastReports: [
-      { label: 'Oct – Dec 2025', data: q3_2025 },
-      { label: 'Jul – Sep 2025', data: q2_2025 },
-      { label: 'Apr – Jun 2025', data: q1_2025 },
+      { label: 'Feb 2026', data: q3_2025 },
+      { label: 'Jan 2026', data: q2_2025 },
+      { label: 'Dec 2025', data: q1_2025 },
     ],
   },
   {
@@ -222,37 +222,37 @@ export const PROJECTS: Project[] = [
     },
     pastReports: [
       {
-        label: 'Oct – Dec 2025',
+        label: 'Feb 2026',
         data: {
           ...q3_2025,
           projectName: 'Enterprise Security Services (ESS)',
           projectDirector: 'David Chen',
           projectDeliveryFunction: 'IT Operations',
-          reportingPeriod: '01/10/2025 to 31/12/2025',
+          reportingPeriod: '01/02/2026 to 28/02/2026',
           overallStatus: 'on-track',
           overallStatusSummary: 'Phase 1 security framework fully deployed. All endpoints secured. Penetration testing completed with satisfactory results.',
         }
       },
       {
-        label: 'Jul – Sep 2025',
+        label: 'Jan 2026',
         data: {
           ...q2_2025,
           projectName: 'Enterprise Security Services (ESS)',
           projectDirector: 'David Chen',
           projectDeliveryFunction: 'IT Operations',
-          reportingPeriod: '01/07/2025 to 30/09/2025',
+          reportingPeriod: '01/01/2026 to 31/01/2026',
           overallStatus: 'alert',
           overallStatusSummary: 'Vendor delivery delays impacting Phase 1 timeline. Escalation in progress.',
         }
       },
       {
-        label: 'Apr – Jun 2025',
+        label: 'Dec 2025',
         data: {
           ...q1_2025,
           projectName: 'Enterprise Security Services (ESS)',
           projectDirector: 'David Chen',
           projectDeliveryFunction: 'IT Operations',
-          reportingPeriod: '01/04/2025 to 30/06/2025',
+          reportingPeriod: '01/12/2025 to 31/12/2025',
           overallStatus: 'on-track',
           overallStatusSummary: 'Project initiated. Requirements gathering complete. Vendor selection finalised.',
         }

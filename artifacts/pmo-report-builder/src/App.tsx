@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { ChatPanel } from './components/ChatPanel';
 import { ReportPanel } from './components/ReportPanel';
-import { ProfileSwitcher } from './components/ProfileSwitcher';
+import { LeftNav } from './components/LeftNav';
 import { useAppState } from './context/AppState';
 import { PROJECTS } from './data/mockData';
 import type { PSRReportData } from './types';
@@ -57,62 +57,58 @@ export default function App() {
   }, [selectedProjectId, markNGISubmitted]);
 
   return (
-    <div className="h-screen w-full flex flex-col overflow-hidden bg-slate-100">
-      {/* Top bar */}
-      <div className="flex items-center gap-4 px-4 py-2.5 bg-[#1a2456] border-b border-[#0f1740] shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded bg-[#2a9fd6] flex items-center justify-center text-white text-xs font-bold">S</div>
-          <span className="text-white text-sm font-semibold">StrategyDotZero</span>
-          <span className="text-[#6cb4e4] text-sm">/ PMO Intelligence</span>
-          <span className="text-[#6cb4e4]">/</span>
-          <span className="text-white text-sm">Report Builder</span>
+    <div className="h-screen w-full flex overflow-hidden bg-slate-100">
+      <LeftNav />
+
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Sub-header */}
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-white border-b border-slate-200 shrink-0">
+          <div>
+            <h1 className="text-sm font-bold text-[#1a2456]">Report Builder</h1>
+            <p className="text-[10px] text-slate-500">March 2026 · PSR due 8 April 2026</p>
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-xs text-slate-500">Project:</span>
+            <select
+              value={selectedProjectId}
+              onChange={e => handleProjectSelect(e.target.value)}
+              className="text-xs text-slate-700 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#2a9fd6]"
+            >
+              {PROJECTS.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#eef4fb] border border-[#c8def0]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#2a9fd6]" />
+              <span className="text-[11px] text-[#2a9fd6] font-medium">Mar 2026 · 01 Mar – 31 Mar 2026</span>
+            </div>
+          </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-xs text-[#6cb4e4]">Project:</span>
-          <select
-            value={selectedProjectId}
-            onChange={e => handleProjectSelect(e.target.value)}
-            className="text-xs text-white bg-[#253470] border border-[#3a4b7a] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2a9fd6]"
-          >
-            {PROJECTS.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#2a9fd6] bg-opacity-20 border border-[#2a9fd6] border-opacity-40">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#2a9fd6]" />
-            <span className="text-[11px] text-[#6cb4e4] font-medium">Q1 2026 · 01 Jan – 31 Mar 2026</span>
+        {/* Main split panel */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <div className="w-[340px] min-w-[300px] max-w-[400px] flex flex-col border-r border-slate-200 shrink-0">
+            <ChatPanel
+              project={selectedProject}
+              allProjects={PROJECTS}
+              onProjectSelect={handleProjectSelect}
+              onReportUpdate={handleReportUpdate}
+              onComplete={handleComplete}
+            />
           </div>
 
-          <ProfileSwitcher currentRole="pm" />
+          <div className="flex-1 min-w-0 flex flex-col">
+            <ReportPanel
+              project={selectedProject}
+              currentReport={currentReport}
+              updatedFields={updatedFields}
+              isComplete={isComplete}
+              onSubmit={handleSubmit}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Main split panel */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="w-[340px] min-w-[300px] max-w-[400px] flex flex-col border-r border-slate-200 shrink-0">
-          <ChatPanel
-            project={selectedProject}
-            allProjects={PROJECTS}
-            onProjectSelect={handleProjectSelect}
-            onReportUpdate={handleReportUpdate}
-            onComplete={handleComplete}
-          />
-        </div>
-
-        <div className="flex-1 min-w-0 flex flex-col">
-          <ReportPanel
-            project={selectedProject}
-            currentReport={currentReport}
-            updatedFields={updatedFields}
-            isComplete={isComplete}
-            onSubmit={handleSubmit}
-          />
-        </div>
-      </div>
-
-      {/* Submitted overlay */}
       {submitted && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center">
@@ -121,7 +117,7 @@ export default function App() {
             </div>
             <h2 className="text-xl font-bold text-[#1a2456] mb-2">Report Submitted!</h2>
             <p className="text-slate-600 text-sm mb-1">
-              Your Q1 2026 PSR for <strong>{selectedProject.name}</strong> has been submitted to the PMO.
+              Your March 2026 PSR for <strong>{selectedProject.name}</strong> has been submitted to the PMO.
             </p>
             <p className="text-slate-500 text-xs mb-6">
               The PMO has been notified and will review your draft shortly.

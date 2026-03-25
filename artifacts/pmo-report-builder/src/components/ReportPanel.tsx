@@ -106,7 +106,7 @@ function DownloadMenu() {
 export function ReportPanel({ project, currentReport, updatedFields, isComplete, onSubmit }: ReportPanelProps) {
   const [activeTab, setActiveTab] = useState(0);
   const tabs = [
-    { label: 'Current Report — Q1 2026', isCurrent: true },
+    { label: 'Current Report — Mar 2026', isCurrent: true },
     ...project.pastReports.map(r => ({ label: r.label, isCurrent: false })),
   ];
 
@@ -152,7 +152,7 @@ export function ReportPanel({ project, currentReport, updatedFields, isComplete,
       {activeTab > 0 && (
         <div className="px-4 py-2 bg-blue-50 border-b border-blue-100 shrink-0">
           <p className="text-xs text-blue-600">
-            📋 This is your <strong>{tabs[activeTab].label}</strong> report — for reference only. Switch back to "Current Report" to continue filling in Q1 2026.
+            📋 This is your <strong>{tabs[activeTab].label}</strong> report — for reference only. Switch back to "Current Report" to continue filling in March 2026.
           </p>
         </div>
       )}
