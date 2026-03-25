@@ -31,11 +31,29 @@ const STATUS_ORDER: Record<ReportingStatus, number> = {
   notified: 0, clicked: 1, submitted: 2, approved: 3, sent: 4,
 };
 
-const TEMPLATE_OPTIONS: Array<{ id: SummaryTemplate; label: string; description: string }> = [
-  { id: 'tabular', label: 'Exec Tabular Summary', description: 'Two-column project table with key risks' },
-  { id: 'bu-head', label: 'BU Head Summary', description: 'Business unit overview by portfolio area' },
-  { id: 'exec-snapshot', label: 'Exec Snapshot', description: 'Pulse-style metrics with context bullets' },
-];
+const TEMPLATE_META: Record<SummaryTemplate, { label: string; usageCount: number; description: string; bestFor: string }> = {
+  tabular: {
+    label: 'Exec Tabular Summary',
+    usageCount: 24,
+    description: 'A structured two-column table listing each project with its delivery narrative and key risks — suited for executives who prefer concise, comparable entries.',
+    bestFor: 'Executive Directors · Steering Committees',
+  },
+  'bu-head': {
+    label: 'BU Head Summary',
+    usageCount: 11,
+    description: 'Groups projects by portfolio area with colour-coded status indicators. Ideal for BU Heads reviewing their own stream alongside the broader portfolio.',
+    bestFor: 'BU Leads · Deputy Secretaries',
+  },
+  'exec-snapshot': {
+    label: 'Exec Snapshot',
+    usageCount: 8,
+    description: 'Pulse-style view with compliance % cards, context bullets per portfolio, and a flagged risk list — designed for time-poor executives who want the highlights only.',
+    bestFor: 'CEOs · COOs · Secretaries',
+  },
+};
+
+const ALL_BUS = ['IT Operations', 'Trade & Investment', 'Digital Transformation', 'Infrastructure', 'Corporate Services', 'Biosecurity'];
+const STEP_LABELS = ['Choose format', 'Configure', 'Review & send'] as const;
 
 const EXECUTIVES = [
   { id: 'e1', name: 'Margaret Chen', title: 'Executive Director', email: 'margaret.chen@strategydotzero.gov' },
@@ -420,6 +438,88 @@ function ExecSnapshotContent({ ngiSubmitted }: { ngiSubmitted: boolean }) {
   );
 }
 
+function TemplatePreviewTabular() {
+  const rows = [
+    { name: 'Enterprise Security Services', status: 'On Track' },
+    { name: 'Digital Workplace Transformation', status: 'Alert' },
+    { name: 'Infrastructure Modernisation', status: 'On Track' },
+  ];
+  return (
+    <div className="rounded-lg overflow-hidden border border-slate-200 text-[9px]">
+      <div className="grid grid-cols-[2fr_3fr] bg-[#1a2456] text-white">
+        <div className="px-2 py-1 font-bold">Project</div>
+        <div className="px-2 py-1 font-bold border-l border-white/10">Status Narrative</div>
+      </div>
+      {rows.map((r, i) => (
+        <div key={r.name} className={`grid grid-cols-[2fr_3fr] ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+          <div className="px-2 py-1.5 font-semibold text-[#1a2456] border-b border-slate-100 leading-tight">{r.name}</div>
+          <div className="px-2 py-1.5 border-b border-l border-slate-100 text-slate-500 leading-tight">
+            <span className={`inline-block px-1 py-0.5 rounded text-[8px] font-bold mb-0.5 ${r.status === 'On Track' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{r.status}</span>
+            <div className="bg-slate-200 h-1.5 rounded-full w-full mt-0.5" /><div className="bg-slate-200 h-1.5 rounded-full w-3/4 mt-0.5" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TemplatePreviewBUHead() {
+  const groups = [
+    { label: 'Digital Uplift Portfolio', color: '#0891b2', bg: '#e0f9ff', count: 4 },
+    { label: 'Infrastructure Delivery', color: '#4f46e5', bg: '#f0f4ff', count: 2 },
+    { label: 'Trade & Corporate', color: '#065f46', bg: '#ecfdf5', count: 4 },
+  ];
+  return (
+    <div className="space-y-1.5 text-[9px]">
+      {groups.map(g => (
+        <div key={g.label} className="rounded-lg overflow-hidden border border-slate-200">
+          <div className="px-2 py-1 flex items-center gap-1.5" style={{ backgroundColor: g.bg }}>
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+            <span className="font-bold" style={{ color: g.color }}>{g.label}</span>
+            <span className="ml-auto text-slate-400">{g.count} projects</span>
+          </div>
+          <div className="px-2 py-1.5 bg-white space-y-1">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+                <div className="bg-slate-200 h-1.5 rounded-full flex-1" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TemplatePreviewSnapshot() {
+  return (
+    <div className="space-y-2 text-[9px]">
+      <div className="grid grid-cols-3 gap-1.5">
+        {[{ label: 'Digital Uplift', pct: '75%', color: '#0891b2', bg: '#e0f9ff' }, { label: 'Infrastructure', pct: '100%', color: '#4f46e5', bg: '#f0f4ff' }, { label: 'Trade & Corp', pct: '67%', color: '#065f46', bg: '#ecfdf5' }].map(c => (
+          <div key={c.label} className="rounded-lg p-2 text-center border" style={{ backgroundColor: c.bg }}>
+            <div className="font-black text-base leading-none" style={{ color: c.color }}>{c.pct}</div>
+            <div className="font-bold mt-0.5 leading-tight" style={{ color: c.color }}>{c.label}</div>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-lg border border-slate-200 overflow-hidden">
+        <div className="bg-[#1a2456] px-2 py-1 text-white font-bold">Context · Mar 2026</div>
+        {['Digital Uplift', 'Infrastructure', 'Trade & Corp'].map(tag => (
+          <div key={tag} className="flex items-start gap-1.5 px-2 py-1.5 border-b border-slate-100">
+            <span className="shrink-0 bg-slate-100 text-slate-500 px-1 py-0.5 rounded font-bold">{tag}</span>
+            <div className="flex-1 space-y-0.5"><div className="bg-slate-200 h-1.5 rounded-full w-full" /><div className="bg-slate-200 h-1.5 rounded-full w-4/5" /></div>
+          </div>
+        ))}
+      </div>
+      <div className="bg-red-50 border border-red-200 rounded-lg px-2 py-1.5">
+        <div className="font-bold text-red-600 mb-1">Key Risks</div>
+        {[1, 2].map(i => <div key={i} className="flex gap-1"><span className="text-red-400">—</span><div className="bg-red-200 h-1.5 rounded-full flex-1 mt-0.5" /></div>)}
+      </div>
+    </div>
+  );
+}
+
 function RecipientPicker({ recipients, onChange }: {
   recipients: Executive[];
   onChange: (r: Executive[]) => void;
@@ -579,29 +679,44 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
   onSent: () => void;
 }) {
   const { ngiSubmitted } = useAppState();
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [template, setTemplate] = useState<SummaryTemplate>('tabular');
+  const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(
+    new Set(projects.filter(p => p.reportingStatus === 'approved' || p.reportingStatus === 'sent').map(p => p.id))
+  );
+  const [selectedBUs, setSelectedBUs] = useState<Set<string>>(new Set(ALL_BUS));
+  const [snapshotScope, setSnapshotScope] = useState<'all' | 'specific'>('all');
+  const [specificSnapshotBUs, setSpecificSnapshotBUs] = useState<Set<string>>(new Set(ALL_BUS));
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [recipients, setRecipients] = useState<Executive[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    new Set(projects.filter(p => p.reportingStatus === 'approved' || p.reportingStatus === 'sent').map(p => p.id))
+
+  const eligibleProjects = projects.filter(p =>
+    p.reportingStatus === 'approved' || p.reportingStatus === 'sent' || (p.id === 'proj-1' && ngiSubmitted)
   );
 
   const rows = useMemo(() => {
     const base = EXEC_SUMMARY_ROWS.filter(r =>
-      projects.some(p => p.name === r.project && selectedIds.has(p.id))
+      projects.some(p => p.name === r.project && selectedProjectIds.has(p.id))
     );
-    if (ngiSubmitted && projects.some(p => p.id === 'proj-1' && selectedIds.has('proj-1'))) {
+    if (ngiSubmitted && projects.some(p => p.id === 'proj-1' && selectedProjectIds.has('proj-1'))) {
       return [NGI_EXEC_ROW, ...base];
     }
     return base;
-  }, [selectedIds, projects, ngiSubmitted]);
+  }, [selectedProjectIds, projects, ngiSubmitted]);
 
-  const handleGenerate = () => {
+  const canProceed = template === 'tabular'
+    ? selectedProjectIds.size > 0
+    : template === 'bu-head'
+    ? selectedBUs.size > 0
+    : snapshotScope === 'all' || specificSnapshotBUs.size > 0;
+
+  const goToStep3 = () => {
+    setStep(3);
     setGenerating(true);
-    setTimeout(() => { setGenerating(false); setGenerated(true); }, 2200);
+    setTimeout(() => { setGenerating(false); setGenerated(true); }, 2400);
   };
 
   const handleSend = () => {
@@ -609,175 +724,352 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
     setTimeout(() => { setSending(false); setSent(true); onSent(); }, 1800);
   };
 
-  const selectedTemplate = TEMPLATE_OPTIONS.find(t => t.id === template)!;
+  const meta = TEMPLATE_META[template];
+
+  const stepTitle = sent ? 'Sent' : step === 1 ? 'Choose a format' : step === 2 ? 'Configure' : generating ? 'Generating…' : 'Review & send';
+
+  const toggleBU = (bu: string, set: Set<string>, setFn: (s: Set<string>) => void) => {
+    const next = new Set(set);
+    if (next.has(bu)) next.delete(bu); else next.add(bu);
+    setFn(next);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={!generating && !sending ? onClose : undefined} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+
+        {/* Header */}
         <div className="bg-[#1a2456] px-6 py-4 shrink-0">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-white font-semibold">AI Executive Summary — March 2026</h2>
-              <p className="text-[#8aaccc] text-xs mt-0.5">Portfolio Report · StrategyDotZero PMO Intelligence</p>
+            <div className="flex items-center gap-2">
+              <span className="text-[#2a9fd6] font-black text-sm tracking-tight">✦ Dotz</span>
+              <span className="text-white/25 mx-1">·</span>
+              <span className="text-white font-semibold text-sm">{stepTitle}</span>
             </div>
-            {!generating && (
-              <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white text-lg">×</button>
+            {!generating && !sending && (
+              <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white text-lg leading-none">×</button>
             )}
           </div>
+          {!sent && (
+            <div className="flex items-center gap-2 mt-2.5">
+              {([1, 2, 3] as const).map((s, i) => (
+                <React.Fragment key={s}>
+                  <span className={`text-[11px] transition-colors font-medium ${s === step ? 'text-[#2a9fd6]' : s < step ? 'text-white/40' : 'text-white/20'}`}>
+                    {s < step ? '✓' : STEP_LABELS[i]}
+                  </span>
+                  {s < 3 && <span className="text-white/15 text-xs">›</span>}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {!generated ? (
-            <>
-              <div>
-                <p className="text-sm font-semibold text-slate-700 mb-2">Select projects to include:</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {projects.filter(p => p.reportingStatus === 'approved' || p.reportingStatus === 'sent' ||
-                    (p.id === 'proj-1' && ngiSubmitted)).map(p => (
-                    <label key={p.id} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(p.id)}
-                        onChange={e => {
-                          const next = new Set(selectedIds);
-                          if (e.target.checked) next.add(p.id);
-                          else next.delete(p.id);
-                          setSelectedIds(next);
-                        }}
-                        className="rounded accent-[#2a9fd6]"
-                      />
-                      <div className="min-w-0">
-                        <div className="text-xs font-medium text-slate-800 truncate">{p.name}</div>
-                        <div className="text-[10px] text-slate-500">{p.projectManager}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+
+          {/* ── STEP 1: Template selection ── */}
+          {step === 1 && (
+            <div className="flex" style={{ minHeight: 380 }}>
+              {/* Left nav */}
+              <div className="w-52 shrink-0 border-r border-slate-100 py-3 px-2 space-y-0.5">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide px-3 pb-1.5">Templates</p>
+                {(Object.keys(TEMPLATE_META) as SummaryTemplate[]).map(tid => {
+                  const m = TEMPLATE_META[tid];
+                  const active = template === tid;
+                  return (
+                    <button
+                      key={tid}
+                      onClick={() => setTemplate(tid)}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl transition-all ${active ? 'bg-[#1a2456] shadow-sm' : 'hover:bg-slate-50'}`}
+                    >
+                      <div className={`text-xs font-semibold leading-snug ${active ? 'text-white' : 'text-slate-800'}`}>{m.label}</div>
+                      <div className={`text-[10px] mt-0.5 ${active ? 'text-white/55' : 'text-slate-400'}`}>Generated {m.usageCount}×</div>
+                    </button>
+                  );
+                })}
               </div>
 
-              <div>
-                <p className="text-xs font-semibold text-slate-600 mb-1.5">Summary Template</p>
-                <div className="flex flex-col gap-1">
-                  {TEMPLATE_OPTIONS.map(opt => (
-                    <label key={opt.id} className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors
-                      ${template === opt.id ? 'border-[#2a9fd6] bg-[#eef4fb]' : 'border-slate-200 hover:bg-slate-50'}`}>
-                      <input
-                        type="radio"
-                        name="template"
-                        value={opt.id}
-                        checked={template === opt.id}
-                        onChange={() => setTemplate(opt.id)}
-                        className="mt-0.5 accent-[#2a9fd6]"
-                      />
-                      <div>
-                        <div className="text-xs font-semibold text-slate-800">{opt.label}</div>
-                        <div className="text-[10px] text-slate-500">{opt.description}</div>
-                      </div>
-                    </label>
-                  ))}
+              {/* Right: preview + description */}
+              <div className="flex-1 flex flex-col gap-4 p-5">
+                <div>
+                  <p className="text-sm font-bold text-[#1a2456]">{meta.label}</p>
+                  <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{meta.description}</p>
+                  <div className="mt-2.5 flex items-center gap-1.5 text-[10px]">
+                    <span className="text-slate-400 font-semibold">Best for:</span>
+                    <span className="text-[#2a9fd6] font-semibold">{meta.bestFor}</span>
+                  </div>
+                </div>
+
+                <div className="flex-1 bg-slate-50 rounded-xl border border-slate-200 p-3 overflow-hidden">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-2">Output preview</p>
+                  {template === 'tabular' && <TemplatePreviewTabular />}
+                  {template === 'bu-head' && <TemplatePreviewBUHead />}
+                  {template === 'exec-snapshot' && <TemplatePreviewSnapshot />}
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setStep(2)}
+                    className="px-5 py-2 rounded-lg bg-[#2a9fd6] hover:bg-[#2490c5] text-white text-sm font-semibold transition-colors flex items-center gap-1.5"
+                  >
+                    Next <span className="text-base leading-none opacity-80">›</span>
+                  </button>
                 </div>
               </div>
+            </div>
+          )}
 
+          {/* ── STEP 2: Configure ── */}
+          {step === 2 && (
+            <div className="p-5 space-y-4">
+
+              {/* Tabular: select projects */}
+              {template === 'tabular' && (
+                <div>
+                  <p className="text-sm font-semibold text-slate-800 mb-0.5">Select projects to include</p>
+                  <p className="text-xs text-slate-400 mb-3">Only approved and submitted reports are available for inclusion</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {eligibleProjects.map(p => (
+                      <label
+                        key={p.id}
+                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors
+                          ${selectedProjectIds.has(p.id) ? 'border-[#2a9fd6] bg-[#eef4fb]' : 'border-slate-200 hover:bg-slate-50'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedProjectIds.has(p.id)}
+                          onChange={e => {
+                            const next = new Set(selectedProjectIds);
+                            if (e.target.checked) next.add(p.id); else next.delete(p.id);
+                            setSelectedProjectIds(next);
+                          }}
+                          className="rounded accent-[#2a9fd6] shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium text-slate-800 truncate">{p.name}</div>
+                          <div className="text-[10px] text-slate-400">{p.projectManager}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  {selectedProjectIds.size > 0 && (
+                    <p className="text-[10px] text-slate-400 mt-2">{selectedProjectIds.size} of {eligibleProjects.length} projects selected</p>
+                  )}
+                </div>
+              )}
+
+              {/* BU Head: select business units */}
+              {template === 'bu-head' && (
+                <div>
+                  <p className="text-sm font-semibold text-slate-800 mb-0.5">Select business units to include</p>
+                  <p className="text-xs text-slate-400 mb-3">Dotz will generate a grouped summary for each selected BU</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {ALL_BUS.map(bu => {
+                      const count = projects.filter(p => p.businessUnit === bu).length;
+                      return (
+                        <label
+                          key={bu}
+                          className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors
+                            ${selectedBUs.has(bu) ? 'border-[#2a9fd6] bg-[#eef4fb]' : 'border-slate-200 hover:bg-slate-50'}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedBUs.has(bu)}
+                            onChange={() => toggleBU(bu, selectedBUs, setSelectedBUs)}
+                            className="rounded accent-[#2a9fd6] shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-medium text-slate-800 truncate">{bu}</div>
+                            <div className="text-[10px] text-slate-400">{count} project{count !== 1 ? 's' : ''}</div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Exec Snapshot: scope selection */}
+              {template === 'exec-snapshot' && (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 mb-0.5">Scope of snapshot</p>
+                    <p className="text-xs text-slate-400 mb-3">Choose whether to cover the full portfolio or focus on specific areas</p>
+                    <div className="space-y-1.5">
+                      {([
+                        { value: 'all', label: 'Full portfolio', sub: 'All projects and business units — recommended for exec-level briefings' },
+                        { value: 'specific', label: 'Specific business units', sub: 'Focus the snapshot on selected BUs only' },
+                      ] as const).map(opt => (
+                        <label
+                          key={opt.value}
+                          className={`flex items-start gap-3 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors
+                            ${snapshotScope === opt.value ? 'border-[#2a9fd6] bg-[#eef4fb]' : 'border-slate-200 hover:bg-slate-50'}`}
+                        >
+                          <input
+                            type="radio"
+                            name="snapshot-scope"
+                            value={opt.value}
+                            checked={snapshotScope === opt.value}
+                            onChange={() => setSnapshotScope(opt.value)}
+                            className="mt-0.5 accent-[#2a9fd6]"
+                          />
+                          <div>
+                            <div className="text-xs font-semibold text-slate-800">{opt.label}</div>
+                            <div className="text-[10px] text-slate-500 mt-0.5">{opt.sub}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {snapshotScope === 'specific' && (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {ALL_BUS.map(bu => {
+                        const count = projects.filter(p => p.businessUnit === bu).length;
+                        return (
+                          <label
+                            key={bu}
+                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors
+                              ${specificSnapshotBUs.has(bu) ? 'border-[#2a9fd6] bg-[#eef4fb]' : 'border-slate-200 hover:bg-slate-50'}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={specificSnapshotBUs.has(bu)}
+                              onChange={() => toggleBU(bu, specificSnapshotBUs, setSpecificSnapshotBUs)}
+                              className="rounded accent-[#2a9fd6] shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-medium text-slate-800 truncate">{bu}</div>
+                              <div className="text-[10px] text-slate-400">{count} project{count !== 1 ? 's' : ''}</div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  onClick={() => setStep(1)}
+                  className="text-xs text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1"
+                >
+                  ‹ Back
+                </button>
+                <button
+                  onClick={goToStep3}
+                  disabled={!canProceed}
+                  className="px-5 py-2 rounded-lg bg-[#2a9fd6] hover:bg-[#2490c5] text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  ✦ Generate with Dotz
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── STEP 3: Preview + Send ── */}
+          {step === 3 && !sent && (
+            <div className="p-5 space-y-4">
               {generating ? (
-                <div className="flex flex-col items-center py-10 gap-4">
-                  <div className="w-10 h-10 border-3 border-[#2a9fd6] border-t-transparent rounded-full animate-spin" style={{ borderWidth: 3 }} />
+                <div className="flex flex-col items-center py-16 gap-5">
+                  <div className="relative w-12 h-12">
+                    <div className="absolute inset-0 rounded-full border-[3px] border-[#2a9fd6]/20" />
+                    <div className="absolute inset-0 rounded-full border-[3px] border-[#2a9fd6] border-t-transparent animate-spin" />
+                  </div>
                   <div className="text-center">
-                    <p className="text-sm font-semibold text-slate-700">Dotz is compiling your executive summary…</p>
-                    <p className="text-xs text-slate-500 mt-1">Applying {selectedTemplate.label} · normalising dates · extracting risks</p>
+                    <p className="text-sm font-semibold text-slate-700">Dotz is compiling your summary…</p>
+                    <p className="text-xs text-slate-400 mt-1">Applying {meta.label} · normalising dates · extracting key risks</p>
                   </div>
                 </div>
               ) : (
-                <div className="flex justify-end">
-                  <button
-                    onClick={handleGenerate}
-                    disabled={selectedIds.size === 0}
-                    className="px-5 py-2 rounded-lg bg-[#2a9fd6] hover:bg-[#2490c5] text-white text-sm font-semibold transition-colors disabled:opacity-40"
-                  >
-                    ✦ Generate Summary ({selectedIds.size} projects)
-                  </button>
-                </div>
-              )}
-            </>
-          ) : !sent ? (
-            <>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-700">Generated Executive Summary</p>
-                  <p className="text-xs text-slate-500">Ready for review and dispatch · {selectedTemplate.label}</p>
-                </div>
-                <span className="text-xs text-[#2a9fd6] bg-[#e0f0fb] px-2 py-0.5 rounded-full font-medium">AI Generated</span>
-              </div>
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">Generated Summary</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{meta.label} · March 2026</p>
+                    </div>
+                    <span className="text-[10px] font-bold text-[#2a9fd6] bg-[#e0f0fb] px-2.5 py-1 rounded-full flex items-center gap-1">
+                      ✦ Dotz AI
+                    </span>
+                  </div>
 
-              {template === 'tabular' && (
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-[#1a2456] text-white">
-                        <th className="px-4 py-2.5 text-left text-xs font-semibold w-[35%]">Project / Program</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-semibold">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((row, i) => (
-                        <tr key={row.project} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                          <td className="px-4 py-3 align-top text-xs font-semibold text-[#1a2456] leading-snug border-b border-slate-100">{row.project}</td>
-                          <td className="px-4 py-3 align-top text-xs text-slate-700 leading-relaxed border-b border-slate-100">
-                            <p>{row.summary}</p>
-                            {row.risks.length > 0 && (
-                              <>
-                                <p className="mt-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Key Risks &amp; Challenges</p>
-                                {row.risks.map((r, ri) => (
-                                  <p key={ri} className="text-xs text-slate-600">— {r}</p>
-                                ))}
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {template === 'bu-head' && (
-                <BUHeadContent rows={rows} />
-              )}
-
-              {template === 'exec-snapshot' && (
-                <ExecSnapshotContent ngiSubmitted={ngiSubmitted} />
-              )}
-
-              <div className="border-t border-slate-200 pt-4 space-y-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-                    To <span className="text-red-500">*</span>
-                  </label>
-                  <RecipientPicker recipients={recipients} onChange={setRecipients} />
-                  {recipients.length === 0 && (
-                    <p className="text-[10px] text-amber-600 mt-1">At least one recipient is required to send.</p>
+                  {template === 'tabular' && (
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-[#1a2456] text-white">
+                            <th className="px-4 py-2.5 text-left text-xs font-semibold w-[35%]">Project / Program</th>
+                            <th className="px-4 py-2.5 text-left text-xs font-semibold">Status Narrative</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((row, i) => (
+                            <tr key={row.project} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                              <td className="px-4 py-3 align-top text-xs font-semibold text-[#1a2456] leading-snug border-b border-slate-100">{row.project}</td>
+                              <td className="px-4 py-3 align-top text-xs text-slate-700 leading-relaxed border-b border-slate-100">
+                                <p>{row.summary}</p>
+                                {row.risks.length > 0 && (
+                                  <>
+                                    <p className="mt-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Key Risks &amp; Challenges</p>
+                                    {row.risks.map((r, ri) => <p key={ri} className="text-xs text-slate-600">— {r}</p>)}
+                                  </>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
-                </div>
-                <div className="flex items-center justify-end gap-2">
-                  <ExecDownloadMenu template={template} projectCount={rows.length || selectedIds.size} />
-                  <button
-                    onClick={handleSend}
-                    disabled={sending || recipients.length === 0}
-                    className="px-5 py-2 rounded-lg bg-[#1a2456] hover:bg-[#232f6b] text-white text-sm font-semibold transition-colors flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {sending ? (
-                      <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending…</>
-                    ) : <><SendUpIcon /> Send to Executive</>}
-                  </button>
-                </div>
+
+                  {template === 'bu-head' && <BUHeadContent rows={rows} />}
+                  {template === 'exec-snapshot' && <ExecSnapshotContent ngiSubmitted={ngiSubmitted} />}
+
+                  <div className="border-t border-slate-100 pt-4 space-y-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+                        Send to <span className="text-red-400">*</span>
+                      </label>
+                      <RecipientPicker recipients={recipients} onChange={setRecipients} />
+                      {recipients.length === 0 && (
+                        <p className="text-[10px] text-amber-600 mt-1.5">At least one recipient is required to send.</p>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => { setStep(2); setGenerated(false); }}
+                        className="text-xs text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1"
+                      >
+                        ‹ Back
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <ExecDownloadMenu template={template} projectCount={rows.length || selectedProjectIds.size} />
+                        <button
+                          onClick={handleSend}
+                          disabled={sending || recipients.length === 0}
+                          className="px-5 py-2 rounded-lg bg-[#1a2456] hover:bg-[#232f6b] text-white text-sm font-semibold transition-colors flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {sending
+                            ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending…</>
+                            : <><SendUpIcon /> Send to Executive</>}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── SENT confirmation ── */}
+          {sent && (
+            <div className="py-12 px-5 text-center">
+              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                <span className="text-green-600 text-2xl">✓</span>
               </div>
-            </>
-          ) : (
-            <div className="py-10 text-center">
-              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-                <span className="text-green-600 text-3xl">✓</span>
-              </div>
-              <p className="text-lg font-bold text-slate-800">Executive Summary Sent</p>
+              <p className="text-lg font-bold text-slate-800">Summary sent</p>
               <p className="text-sm text-slate-500 mt-1">
                 {recipients.length === 1
                   ? `${recipients[0].name} has been notified with the March 2026 portfolio summary.`
@@ -785,7 +1077,7 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
               </p>
               <div className="mt-4 inline-block bg-slate-50 border border-slate-200 rounded-xl px-6 py-3 text-xs text-slate-600 text-left">
                 <p>✉ Sent to: <strong>{recipients.map(r => r.email).join(', ')}</strong></p>
-                <p className="mt-1">📎 Format: {selectedTemplate.label} · {rows.length || 'All'} projects covered</p>
+                <p className="mt-1">📎 Format: {meta.label} · {rows.length || 'All'} projects covered</p>
                 <p className="mt-1">⏱ Sent: {new Date().toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })} at {new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}</p>
               </div>
               <button onClick={onClose} className="mt-5 px-5 py-2 rounded-lg bg-[#1a2456] text-white text-sm font-semibold hover:bg-[#232f6b] transition-colors">
@@ -793,6 +1085,7 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
               </button>
             </div>
           )}
+
         </div>
       </div>
     </div>
