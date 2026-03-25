@@ -52,7 +52,20 @@ const TEMPLATE_META: Record<SummaryTemplate, { label: string; usageCount: number
   },
 };
 
-const ALL_BUS = ['IT Operations', 'Trade & Investment', 'Digital Transformation', 'Infrastructure', 'Corporate Services', 'Biosecurity'];
+const PORTFOLIO_GROUPS = [
+  { key: 'digital-uplift', label: 'Digital Uplift Portfolio', snapTag: 'Digital Uplift', snapContextTag: 'Digital Uplift', color: '#0891b2', bg: '#e0f9ff', border: '#a5f3fc', pct: 75, projectCount: 4 },
+  { key: 'infrastructure', label: 'Infrastructure Delivery', snapTag: 'Infrastructure', snapContextTag: 'Infrastructure', color: '#4f46e5', bg: '#f0f4ff', border: '#c7d2fe', pct: 100, projectCount: 2 },
+  { key: 'trade-corp', label: 'Trade, Corporate & Biosecurity', snapTag: 'Trade & Corporate', snapContextTag: 'Trade & Corp', color: '#065f46', bg: '#ecfdf5', border: '#6ee7b7', pct: 67, projectCount: 4 },
+];
+const PORTFOLIO_CONTEXT: Record<string, string> = {
+  'digital-uplift': 'Strong delivery across ESS and Cyber Resilience with both programmes meeting March milestones. Data Governance classification tooling gated on legal MOU review — outcome 15 Apr will unblock deployment.',
+  'infrastructure': 'Both programmes delivering ahead of plan. Smart Buildings exceeded energy reduction target (18% vs 15%). Infrastructure Modernisation Phase 2 vendor selection complete — contract award 01 Apr.',
+  'trade-corp': 'HR Systems go-live delivered cleanly 01 Mar. Trade Gateway under pressure from Customs API delays — recovery plan active. Executive support with Customs escalation would accelerate resolution.',
+};
+const PORTFOLIO_RISKS: Record<string, string> = {
+  'trade-corp': 'Trade Gateway: Customs API integration delays threaten go-live date. Deputy Secretary escalation active — executive support recommended.',
+  'digital-uplift': 'Data Governance: Legal MOU review (expected 15 Apr) is sole gate for classification tool deployment — monitoring closely.',
+};
 const STEP_LABELS = ['Choose format', 'Configure', 'Review & send'] as const;
 
 const EXECUTIVES = [
@@ -294,9 +307,10 @@ function ReminderModal({ projects, onClose }: { projects: DashboardProject[]; on
   );
 }
 
-function BUHeadContent({ rows }: { rows: typeof EXEC_SUMMARY_ROWS }) {
-  const buGroups = [
+function BUHeadContent({ rows, selectedGroups }: { rows: typeof EXEC_SUMMARY_ROWS; selectedGroups?: Set<string> }) {
+  const allBuGroups = [
     {
+      key: 'digital-uplift',
       name: 'Digital Uplift Portfolio',
       color: '#0891b2',
       bgColor: '#e0f9ff',
@@ -308,6 +322,7 @@ function BUHeadContent({ rows }: { rows: typeof EXEC_SUMMARY_ROWS }) {
       ],
     },
     {
+      key: 'infrastructure',
       name: 'Infrastructure Delivery',
       color: '#4f46e5',
       bgColor: '#f0f4ff',
@@ -317,6 +332,7 @@ function BUHeadContent({ rows }: { rows: typeof EXEC_SUMMARY_ROWS }) {
       ],
     },
     {
+      key: 'trade-corp',
       name: 'Trade, Corporate & Biosecurity',
       color: '#065f46',
       bgColor: '#ecfdf5',
@@ -328,6 +344,7 @@ function BUHeadContent({ rows }: { rows: typeof EXEC_SUMMARY_ROWS }) {
       ],
     },
   ];
+  const buGroups = selectedGroups ? allBuGroups.filter(g => selectedGroups.has(g.key)) : allBuGroups;
 
   const statusColors: Record<string, string> = {
     'on-track': 'text-green-700 bg-green-50 border-green-200',
@@ -372,18 +389,25 @@ function BUHeadContent({ rows }: { rows: typeof EXEC_SUMMARY_ROWS }) {
   );
 }
 
-function ExecSnapshotContent({ ngiSubmitted }: { ngiSubmitted: boolean }) {
+function ExecSnapshotContent({ ngiSubmitted, selectedPortfolios }: { ngiSubmitted: boolean; selectedPortfolios?: Set<string> }) {
+  const show = (key: string) => !selectedPortfolios || selectedPortfolios.has(key);
+
+  const visibleGroups = PORTFOLIO_GROUPS.filter(pg => show(pg.key));
+  const risks = [
+    show('trade-corp') ? PORTFOLIO_RISKS['trade-corp'] : null,
+    show('digital-uplift') ? PORTFOLIO_RISKS['digital-uplift'] : null,
+    ngiSubmitted && show('trade-corp') ? 'NGI: Regulatory approval timeline extended +6 weeks — fast-track application submitted, residual risk MEDIUM.' : null,
+  ].filter(Boolean) as string[];
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: 'Digital Uplift', pct: 75, color: '#0891b2', bg: '#e0f9ff', border: '#a5f3fc' },
-          { label: 'Infrastructure', pct: 100, color: '#4f46e5', bg: '#f0f4ff', border: '#c7d2fe' },
-          { label: 'Trade & Corporate', pct: ngiSubmitted ? 78 : 67, color: '#065f46', bg: '#ecfdf5', border: '#6ee7b7' },
-        ].map(card => (
-          <div key={card.label} className="rounded-xl p-4 text-center border" style={{ backgroundColor: card.bg, borderColor: card.border }}>
-            <p className="text-3xl font-black leading-none" style={{ color: card.color }}>{card.pct}<span className="text-lg">%</span></p>
-            <p className="text-[10px] font-bold uppercase tracking-wide mt-1.5 mb-0.5" style={{ color: card.color }}>{card.label}</p>
+      <div className={`grid gap-3 ${visibleGroups.length === 1 ? 'grid-cols-1 max-w-xs' : visibleGroups.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+        {visibleGroups.map(pg => (
+          <div key={pg.key} className="rounded-xl p-4 text-center border" style={{ backgroundColor: pg.bg, borderColor: pg.border }}>
+            <p className="text-3xl font-black leading-none" style={{ color: pg.color }}>
+              {pg.key === 'trade-corp' && ngiSubmitted ? 78 : pg.pct}<span className="text-lg">%</span>
+            </p>
+            <p className="text-[10px] font-bold uppercase tracking-wide mt-1.5 mb-0.5" style={{ color: pg.color }}>{pg.snapTag}</p>
             <p className="text-[10px] text-slate-500">Reporting Compliance</p>
           </div>
         ))}
@@ -394,36 +418,32 @@ function ExecSnapshotContent({ ngiSubmitted }: { ngiSubmitted: boolean }) {
           <p className="text-xs font-bold text-white uppercase tracking-wide">Context This Cycle — March 2026</p>
         </div>
         <div className="divide-y divide-slate-100">
-          {[
-            { tag: 'Digital Uplift', tagColor: '#0891b2', tagBg: '#e0f9ff', text: 'Strong delivery across ESS and Cyber Resilience with both programmes meeting March milestones. Data Governance classification tooling gated on legal MOU review — outcome 15 Apr will unblock deployment.' },
-            { tag: 'Infrastructure', tagColor: '#4f46e5', tagBg: '#f0f4ff', text: 'Both programmes delivering ahead of plan. Smart Buildings exceeded energy reduction target (18% vs 15%). Infrastructure Modernisation Phase 2 vendor selection complete — contract award 01 Apr.' },
-            { tag: 'Trade & Corp', tagColor: '#065f46', tagBg: '#ecfdf5', text: 'HR Systems go-live delivered cleanly 01 Mar. Trade Gateway under pressure from Customs API delays — recovery plan active. Executive support with Customs escalation would accelerate resolution.' + (ngiSubmitted ? ' NGI Phase 2 market entry commenced successfully.' : '') },
-          ].map(row => (
-            <div key={row.tag} className="px-4 py-3 flex items-start gap-3">
-              <span className="shrink-0 mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap" style={{ color: row.tagColor, backgroundColor: row.tagBg }}>{row.tag}</span>
-              <p className="text-xs text-slate-700 leading-relaxed">{row.text}</p>
+          {visibleGroups.map(pg => (
+            <div key={pg.key} className="px-4 py-3 flex items-start gap-3">
+              <span className="shrink-0 mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap" style={{ color: pg.color, backgroundColor: pg.bg }}>{pg.snapContextTag}</span>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                {PORTFOLIO_CONTEXT[pg.key]}{pg.key === 'trade-corp' && ngiSubmitted ? ' NGI Phase 2 market entry commenced successfully.' : ''}
+              </p>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden">
-        <div className="px-4 py-2 bg-red-100 border-b border-red-200">
-          <p className="text-xs font-bold text-red-700 uppercase tracking-wide">Key Risks Requiring Executive Attention</p>
+      {risks.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden">
+          <div className="px-4 py-2 bg-red-100 border-b border-red-200">
+            <p className="text-xs font-bold text-red-700 uppercase tracking-wide">Key Risks Requiring Executive Attention</p>
+          </div>
+          <div className="px-4 py-3 space-y-2">
+            {risks.map((risk, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs text-red-700">
+                <span className="shrink-0 mt-0.5 font-bold">—</span>
+                <span className="leading-relaxed">{risk}</span>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="px-4 py-3 space-y-2">
-          {[
-            'Trade Gateway: Customs API integration delays threaten go-live date. Deputy Secretary escalation active — executive support recommended.',
-            'Data Governance: Legal MOU review (expected 15 Apr) is sole gate for classification tool deployment — monitoring closely.',
-            ngiSubmitted ? 'NGI: Regulatory approval timeline extended +6 weeks — fast-track application submitted, residual risk MEDIUM.' : null,
-          ].filter(Boolean).map((risk, i) => (
-            <div key={i} className="flex items-start gap-2 text-xs text-red-700">
-              <span className="shrink-0 mt-0.5 font-bold">—</span>
-              <span className="leading-relaxed">{risk}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
 
       <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">Portfolio Summary</p>
@@ -684,9 +704,9 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(
     new Set(projects.filter(p => p.reportingStatus === 'approved' || p.reportingStatus === 'sent').map(p => p.id))
   );
-  const [selectedBUs, setSelectedBUs] = useState<Set<string>>(new Set(ALL_BUS));
+  const [selectedBUGroups, setSelectedBUGroups] = useState<Set<string>>(new Set(PORTFOLIO_GROUPS.map(pg => pg.key)));
   const [snapshotScope, setSnapshotScope] = useState<'all' | 'specific'>('all');
-  const [specificSnapshotBUs, setSpecificSnapshotBUs] = useState<Set<string>>(new Set(ALL_BUS));
+  const [specificSnapshotPortfolios, setSpecificSnapshotPortfolios] = useState<Set<string>>(new Set(PORTFOLIO_GROUPS.map(pg => pg.key)));
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
   const [sending, setSending] = useState(false);
@@ -710,8 +730,8 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
   const canProceed = template === 'tabular'
     ? selectedProjectIds.size > 0
     : template === 'bu-head'
-    ? selectedBUs.size > 0
-    : snapshotScope === 'all' || specificSnapshotBUs.size > 0;
+    ? selectedBUGroups.size > 0
+    : snapshotScope === 'all' || specificSnapshotPortfolios.size > 0;
 
   const goToStep3 = () => {
     setStep(3);
@@ -726,7 +746,7 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
 
   const meta = TEMPLATE_META[template];
 
-  const stepTitle = sent ? 'Sent' : step === 1 ? 'Choose a format' : step === 2 ? 'Configure' : generating ? 'Generating…' : 'Review & send';
+  const stepTitle = 'Generate Executive Summary';
 
   const toggleBU = (bu: string, set: Set<string>, setFn: (s: Set<string>) => void) => {
     const next = new Set(set);
@@ -743,7 +763,7 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
         <div className="bg-[#1a2456] px-6 py-4 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-[#2a9fd6] font-black text-sm tracking-tight">✦ Dotz</span>
+              <span className="text-[#2a9fd6] font-black text-sm tracking-tight">✦ DotZ</span>
               <span className="text-white/25 mx-1">·</span>
               <span className="text-white font-semibold text-sm">{stepTitle}</span>
             </div>
@@ -784,7 +804,7 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
                       className={`w-full text-left px-3 py-2.5 rounded-xl transition-all ${active ? 'bg-[#1a2456] shadow-sm' : 'hover:bg-slate-50'}`}
                     >
                       <div className={`text-xs font-semibold leading-snug ${active ? 'text-white' : 'text-slate-800'}`}>{m.label}</div>
-                      <div className={`text-[10px] mt-0.5 ${active ? 'text-white/55' : 'text-slate-400'}`}>Generated {m.usageCount}×</div>
+                      <div className={`text-[10px] mt-0.5 ${active ? 'text-white/55' : 'text-slate-400'}`}>Generated {m.usageCount} times</div>
                     </button>
                   );
                 })}
@@ -859,33 +879,31 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
                 </div>
               )}
 
-              {/* BU Head: select business units */}
+              {/* BU Head: select portfolio areas */}
               {template === 'bu-head' && (
                 <div>
-                  <p className="text-sm font-semibold text-slate-800 mb-0.5">Select business units to include</p>
-                  <p className="text-xs text-slate-400 mb-3">Dotz will generate a grouped summary for each selected BU</p>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {ALL_BUS.map(bu => {
-                      const count = projects.filter(p => p.businessUnit === bu).length;
-                      return (
-                        <label
-                          key={bu}
-                          className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors
-                            ${selectedBUs.has(bu) ? 'border-[#2a9fd6] bg-[#eef4fb]' : 'border-slate-200 hover:bg-slate-50'}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedBUs.has(bu)}
-                            onChange={() => toggleBU(bu, selectedBUs, setSelectedBUs)}
-                            className="rounded accent-[#2a9fd6] shrink-0"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="text-xs font-medium text-slate-800 truncate">{bu}</div>
-                            <div className="text-[10px] text-slate-400">{count} project{count !== 1 ? 's' : ''}</div>
-                          </div>
-                        </label>
-                      );
-                    })}
+                  <p className="text-sm font-semibold text-slate-800 mb-0.5">Select portfolio areas to include</p>
+                  <p className="text-xs text-slate-400 mb-3">DotZ will generate a grouped summary for each selected portfolio</p>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {PORTFOLIO_GROUPS.map(pg => (
+                      <label
+                        key={pg.key}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors
+                          ${selectedBUGroups.has(pg.key) ? 'border-[#2a9fd6] bg-[#eef4fb]' : 'border-slate-200 hover:bg-slate-50'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedBUGroups.has(pg.key)}
+                          onChange={() => toggleBU(pg.key, selectedBUGroups, setSelectedBUGroups)}
+                          className="rounded accent-[#2a9fd6] shrink-0"
+                        />
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: pg.color }} />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-semibold text-slate-800">{pg.label}</div>
+                          <div className="text-[10px] text-slate-400">{pg.projectCount} projects</div>
+                        </div>
+                      </label>
+                    ))}
                   </div>
                 </div>
               )}
@@ -898,8 +916,8 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
                     <p className="text-xs text-slate-400 mb-3">Choose whether to cover the full portfolio or focus on specific areas</p>
                     <div className="space-y-1.5">
                       {([
-                        { value: 'all', label: 'Full portfolio', sub: 'All projects and business units — recommended for exec-level briefings' },
-                        { value: 'specific', label: 'Specific business units', sub: 'Focus the snapshot on selected BUs only' },
+                        { value: 'all', label: 'Full portfolio', sub: 'All portfolio areas included — recommended for exec-level briefings' },
+                        { value: 'specific', label: 'Specific portfolio areas', sub: 'Focus the snapshot on selected areas only' },
                       ] as const).map(opt => (
                         <label
                           key={opt.value}
@@ -924,28 +942,26 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
                   </div>
 
                   {snapshotScope === 'specific' && (
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {ALL_BUS.map(bu => {
-                        const count = projects.filter(p => p.businessUnit === bu).length;
-                        return (
-                          <label
-                            key={bu}
-                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors
-                              ${specificSnapshotBUs.has(bu) ? 'border-[#2a9fd6] bg-[#eef4fb]' : 'border-slate-200 hover:bg-slate-50'}`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={specificSnapshotBUs.has(bu)}
-                              onChange={() => toggleBU(bu, specificSnapshotBUs, setSpecificSnapshotBUs)}
-                              className="rounded accent-[#2a9fd6] shrink-0"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-xs font-medium text-slate-800 truncate">{bu}</div>
-                              <div className="text-[10px] text-slate-400">{count} project{count !== 1 ? 's' : ''}</div>
-                            </div>
-                          </label>
-                        );
-                      })}
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {PORTFOLIO_GROUPS.map(pg => (
+                        <label
+                          key={pg.key}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors
+                            ${specificSnapshotPortfolios.has(pg.key) ? 'border-[#2a9fd6] bg-[#eef4fb]' : 'border-slate-200 hover:bg-slate-50'}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={specificSnapshotPortfolios.has(pg.key)}
+                            onChange={() => toggleBU(pg.key, specificSnapshotPortfolios, setSpecificSnapshotPortfolios)}
+                            className="rounded accent-[#2a9fd6] shrink-0"
+                          />
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: pg.color }} />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-semibold text-slate-800">{pg.label}</div>
+                            <div className="text-[10px] text-slate-400">{pg.projectCount} projects</div>
+                          </div>
+                        </label>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -963,7 +979,7 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
                   disabled={!canProceed}
                   className="px-5 py-2 rounded-lg bg-[#2a9fd6] hover:bg-[#2490c5] text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  ✦ Generate with Dotz
+                  ✦ Generate with DotZ
                 </button>
               </div>
             </div>
@@ -979,7 +995,7 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
                     <div className="absolute inset-0 rounded-full border-[3px] border-[#2a9fd6] border-t-transparent animate-spin" />
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-semibold text-slate-700">Dotz is compiling your summary…</p>
+                    <p className="text-sm font-semibold text-slate-700">DotZ is compiling your summary…</p>
                     <p className="text-xs text-slate-400 mt-1">Applying {meta.label} · normalising dates · extracting key risks</p>
                   </div>
                 </div>
@@ -991,7 +1007,7 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
                       <p className="text-xs text-slate-400 mt-0.5">{meta.label} · March 2026</p>
                     </div>
                     <span className="text-[10px] font-bold text-[#2a9fd6] bg-[#e0f0fb] px-2.5 py-1 rounded-full flex items-center gap-1">
-                      ✦ Dotz AI
+                      ✦ DotZ AI
                     </span>
                   </div>
 
@@ -1024,8 +1040,13 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
                     </div>
                   )}
 
-                  {template === 'bu-head' && <BUHeadContent rows={rows} />}
-                  {template === 'exec-snapshot' && <ExecSnapshotContent ngiSubmitted={ngiSubmitted} />}
+                  {template === 'bu-head' && <BUHeadContent rows={rows} selectedGroups={selectedBUGroups} />}
+                  {template === 'exec-snapshot' && (
+                    <ExecSnapshotContent
+                      ngiSubmitted={ngiSubmitted}
+                      selectedPortfolios={snapshotScope === 'specific' ? specificSnapshotPortfolios : undefined}
+                    />
+                  )}
 
                   <div className="border-t border-slate-100 pt-4 space-y-3">
                     <div>
@@ -1246,7 +1267,7 @@ export default function PMODashboard() {
         {/* Sub-header */}
         <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200 shrink-0">
           <div>
-            <h1 className="text-base font-bold text-[#1a2456]">Reporting Compliance Dashboard</h1>
+            <h1 className="text-base font-bold text-[#1a2456]">Reporting Compliance Monitor</h1>
             <p className="text-xs text-slate-500 mt-0.5">
               Monitoring {projects.length} projects · Deadline: <span className="font-medium text-slate-700">Wednesday, 8 April 2026</span>
               <span className="mx-2 text-slate-300">·</span>
