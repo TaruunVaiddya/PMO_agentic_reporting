@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const SparklesIcon = () => (
@@ -40,158 +40,64 @@ const LogoutIcon = () => (
 );
 
 const NAV_ITEMS = [
-  {
-    id: 'pm',
-    label: 'Report Builder',
-    sublabel: 'PM View',
-    path: '/',
-    icon: <SparklesIcon />,
-    dummy: false,
-  },
-  {
-    id: 'pmo',
-    label: 'Compliance Monitor',
-    sublabel: 'PMO View',
-    path: '/pmo',
-    icon: <ClockIcon />,
-    dummy: false,
-  },
-  {
-    id: 'analytics',
-    label: 'Analytics',
-    sublabel: 'Coming Soon',
-    path: null,
-    icon: <BrainIcon />,
-    dummy: true,
-  },
-  {
-    id: 'schedule',
-    label: 'Schedule',
-    sublabel: 'Coming Soon',
-    path: null,
-    icon: <CalendarIcon />,
-    dummy: true,
-  },
+  { id: 'pm',        label: 'Report Builder',    path: '/',    icon: <SparklesIcon />, dummy: false },
+  { id: 'pmo',       label: 'Compliance Monitor', path: '/pmo', icon: <ClockIcon />,    dummy: false },
+  { id: 'analytics', label: 'Analytics',          path: null,   icon: <BrainIcon />,    dummy: true  },
+  { id: 'schedule',  label: 'Schedule',           path: null,   icon: <CalendarIcon />, dummy: true  },
 ];
 
-const PROFILES: Record<string, { name: string; title: string; initial: string }> = {
-  '/': { name: 'Sarah Mitchell', title: 'Project Manager', initial: 'S' },
-  '/pmo': { name: 'Marcus Webb', title: 'PMO Director', initial: 'M' },
-};
-
 export function LeftNav() {
-  const [expanded, setExpanded] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const path = location.pathname;
-  const profile = PROFILES[path] || PROFILES['/'];
 
   return (
-    <>
-      {expanded && (
-        <div className="fixed inset-0 z-40" onClick={() => setExpanded(false)} />
-      )}
-      <div className="relative z-50 flex-shrink-0 w-14 h-full">
-        <div
-          className={`absolute left-0 top-0 h-full bg-[#1a2456] flex flex-col shadow-xl transition-[width] duration-300 ease-in-out overflow-hidden ${expanded ? 'w-56 shadow-2xl' : 'w-14'}`}
-        >
-          {/* Logo */}
-          <div className="flex items-center h-14 px-3 border-b border-[#253470] shrink-0">
-            <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
-              <img src="/images/sdz-symbol.png" alt="StrategyDotZero" className="w-8 h-8 object-contain" />
-            </div>
-            {expanded && (
-              <div className="ml-3 overflow-hidden whitespace-nowrap">
-                <div className="text-white text-sm font-bold">StrategyDotZero</div>
-                <div className="text-[#6cb4e4] text-[10px]">PMO Intelligence</div>
-              </div>
-            )}
-          </div>
+    <div className="relative z-50 flex-shrink-0 w-14 h-full">
+      <div className="absolute left-0 top-0 h-full w-14 bg-[#1a2456] flex flex-col shadow-xl">
 
-          {/* Toggle button */}
-          <button
-            onClick={() => setExpanded(e => !e)}
-            className="absolute top-[52px] -right-3 z-50 w-6 h-6 rounded-full bg-[#2a9fd6] border-2 border-white flex items-center justify-center shadow-md hover:bg-[#2490c5] transition-colors"
-            title={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5} className={`w-3 h-3 transition-transform duration-300 ${expanded ? '' : 'rotate-180'}`}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
+        {/* Logo */}
+        <div className="flex items-center justify-center h-14 border-b border-[#253470] shrink-0">
+          <img src="/images/sdz-symbol.png" alt="StrategyDotZero" className="w-8 h-8 object-contain" />
+        </div>
+
+        {/* Nav items */}
+        <nav className="flex-1 flex flex-col items-center px-2 pt-4 space-y-2 overflow-hidden">
+          {NAV_ITEMS.map(item => {
+            const isActive = item.path !== null && (path === item.path || (item.path !== '/' && path.startsWith(item.path)));
+            return (
+              <button
+                key={item.id}
+                disabled={item.dummy}
+                onClick={() => { if (!item.dummy && item.path) navigate(item.path); }}
+                title={item.label}
+                className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors cursor-pointer
+                  ${isActive
+                    ? 'bg-white text-[#1a2456]'
+                    : item.dummy
+                      ? 'text-white/50 cursor-not-allowed'
+                      : 'text-white hover:bg-white/10'
+                  }`}
+              >
+                {item.icon}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Bottom utility icons + logo */}
+        <div className="shrink-0 flex flex-col items-center px-2 pb-3 pt-2 border-t border-[#253470] space-y-2">
+          <button disabled title="Settings" className="w-10 h-10 flex items-center justify-center rounded-xl text-white/50 cursor-not-allowed">
+            <SettingsIcon />
           </button>
-
-          {/* User avatar */}
-          <div className="flex items-center gap-3 px-3 py-3 border-b border-[#253470] shrink-0">
-            <div className="w-8 h-8 rounded-full bg-[#2a9fd6] flex items-center justify-center text-white text-sm font-bold shrink-0">
-              {profile.initial}
-            </div>
-            {expanded && (
-              <div className="min-w-0 overflow-hidden whitespace-nowrap">
-                <div className="text-[11px] font-semibold text-white leading-tight">{profile.name}</div>
-                <div className="text-[10px] text-[#6cb4e4] leading-tight">{profile.title}</div>
-              </div>
-            )}
-          </div>
-
-          {/* Nav items */}
-          <nav className="flex-1 px-2 pt-3 space-y-1 overflow-hidden">
-            {NAV_ITEMS.map(item => {
-              const isActive = item.path !== null && (path === item.path || (item.path !== '/' && path.startsWith(item.path)));
-              return (
-                <button
-                  key={item.id}
-                  disabled={item.dummy}
-                  onClick={() => {
-                    if (!item.dummy && item.path) {
-                      navigate(item.path);
-                      setExpanded(false);
-                    }
-                  }}
-                  title={!expanded ? item.label : undefined}
-                  className={`w-full flex items-center gap-3 px-2 py-2.5 rounded-lg transition-colors text-left
-                    ${isActive ? 'bg-[#2a9fd6] text-white' : ''}
-                    ${!isActive && !item.dummy ? 'text-[#8aaccc] hover:bg-[#253470] hover:text-white' : ''}
-                    ${item.dummy ? 'text-[#4a6a9a] opacity-40 cursor-not-allowed' : ''}`}
-                >
-                  <span className="shrink-0">{item.icon}</span>
-                  {expanded && (
-                    <div className="min-w-0 overflow-hidden whitespace-nowrap">
-                      <div className="text-sm font-medium leading-tight">{item.label}</div>
-                      <div className={`text-[10px] leading-tight ${isActive ? 'text-white/70' : 'text-[#4a6a9a]'}`}>{item.sublabel}</div>
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Bottom utility icons */}
-          <div className="shrink-0 px-2 pb-2 space-y-1 border-t border-[#253470] pt-2">
-            <button
-              disabled
-              title={!expanded ? 'Settings' : undefined}
-              className="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg text-[#4a6a9a] opacity-40 cursor-not-allowed text-left"
-            >
-              <span className="shrink-0"><SettingsIcon /></span>
-              {expanded && <span className="text-sm font-medium whitespace-nowrap">Settings</span>}
-            </button>
-            <button
-              disabled
-              title={!expanded ? 'Log out' : undefined}
-              className="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg text-[#4a6a9a] opacity-40 cursor-not-allowed text-left"
-            >
-              <span className="shrink-0"><LogoutIcon /></span>
-              {expanded && <span className="text-sm font-medium whitespace-nowrap">Log out</span>}
-            </button>
-
-            {/* SDZ logo mark */}
-            <div className="flex items-center justify-center pt-1 pb-1">
-              <div className="w-8 h-8 rounded-full overflow-hidden opacity-70">
-                <img src="/images/sdz-symbol.png" alt="StrategyDotZero" className="w-8 h-8 object-contain" />
-              </div>
-            </div>
+          <button disabled title="Log out" className="w-10 h-10 flex items-center justify-center rounded-xl text-white/50 cursor-not-allowed">
+            <LogoutIcon />
+          </button>
+          <div className="pt-1">
+            <img src="/images/sdz-symbol.png" alt="StrategyDotZero" className="w-7 h-7 object-contain opacity-60" />
           </div>
         </div>
+
       </div>
-    </>
+    </div>
   );
 }
