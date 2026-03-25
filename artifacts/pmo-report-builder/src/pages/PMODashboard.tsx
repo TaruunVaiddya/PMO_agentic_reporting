@@ -643,9 +643,9 @@ function ExecDownloadMenu({ template, projectCount }: { template: string; projec
   }, []);
 
   const formats = [
-    { label: 'PDF Document', ext: 'pdf', icon: '📄' },
-    { label: 'Word Document', ext: 'docx', icon: '📝' },
-    { label: 'PowerPoint Deck', ext: 'pptx', icon: '📊' },
+    { label: 'PDF Document', ext: 'pdf' },
+    { label: 'Word Document', ext: 'docx' },
+    { label: 'PowerPoint Deck', ext: 'pptx' },
   ];
 
   const handleDownload = (ext: string) => {
@@ -680,7 +680,6 @@ function ExecDownloadMenu({ template, projectCount }: { template: string; projec
               onClick={() => handleDownload(f.ext)}
               className="w-full text-left px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors"
             >
-              <span className="text-base">{f.icon}</span>
               <div>
                 <div className="text-xs font-medium">{f.label}</div>
                 <div className="text-[10px] text-slate-400">.{f.ext} · {projectCount} project{projectCount !== 1 ? 's' : ''} included</div>

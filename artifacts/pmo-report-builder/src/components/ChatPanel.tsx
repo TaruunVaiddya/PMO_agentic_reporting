@@ -79,29 +79,23 @@ function SuggestionButtons({ suggestions, onSelect }: { suggestions: string[]; o
         onClick={() => onSelect('__custom__')}
         className="text-xs px-3 py-1.5 rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100 transition-colors"
       >
-        ✏️ Type my own answer
+        Type my own answer
       </button>
     </div>
   );
 }
 
-function useTypewriter(text: string, speed = 12) {
-  const [displayed, setDisplayed] = useState('');
-  const [done, setDone] = useState(false);
-  useEffect(() => {
-    setDisplayed('');
-    setDone(false);
-    if (!text) return;
-    let i = 0;
-    const interval = setInterval(() => {
-      i++;
-      setDisplayed(text.slice(0, i));
-      if (i >= text.length) { clearInterval(interval); setDone(true); }
-    }, speed);
-    return () => clearInterval(interval);
-  }, [text]);
-  return { displayed, done };
-}
+// Track the live accumulated projectStatus to avoid spreading from stale props
+const DEFAULT_PROJECT_STATUS: PSRReportData['projectStatus'] = {
+  dependency: 'not-tracked',
+  issues: 'not-tracked',
+  resource: 'not-tracked',
+  benefits: 'not-tracked',
+  risks: 'not-tracked',
+  budget: 'not-tracked',
+  scope: 'not-tracked',
+  schedule: 'not-tracked',
+};
 
 export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdate, onComplete }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -109,11 +103,11 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [awaitingSuggestions, setAwaitingSuggestions] = useState<string[] | null>(null);
-  const [awaitingCustom, setAwaitingCustom] = useState(false);
-  const [memoryDump, setMemoryDump] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const initialized = useRef(false);
+  // Tracks the live projectStatus so follow-up handlers never spread from stale props
+  const projectStatusRef = useRef<PSRReportData['projectStatus']>({ ...DEFAULT_PROJECT_STATUS });
 
   const addMsg = (role: 'assistant' | 'user', content: string, suggestions?: string[]) => {
     const msg: ChatMessage = { id: Date.now().toString(), role, content, timestamp: new Date(), suggestions };
@@ -129,7 +123,7 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
 
   useEffect(() => { scrollToBottom(); }, [messages, isProcessing]);
 
-  // Initial welcome sequence
+  // Initial welcome — single project, go directly to memory_dump
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
@@ -139,73 +133,95 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
     (async () => {
       await delay(600);
       addMsg('assistant',
-        `Hi Sarah! 👋 Welcome — I'm Dotz, your PMO reporting assistant. I'm so excited to help you get this done today!`
+        `Hi Sarah, welcome back. I'm Dotz, your PMO reporting assistant.`
       );
       await delay(1200);
       addMsg('assistant',
-        `You're submitting project status reports for the reporting interval:\n\n📅 01 Jan 2026 – 31 Mar 2026\n\nI've pulled up your blank report template and your last 3 completed reports on the right panel — take a peek at those for reference anytime!`
+        `You're submitting the Project Status Report for:\n\nEnterprise Security Services (ESS)\nReporting period: 01 March 2026 – 31 March 2026\n\nI've loaded your last three reports on the right for reference. When you're ready, give me a brain dump of everything that happened this quarter — milestones, budget, risks, issues, wins. Don't worry about structure, I will handle that.`
       );
-      await delay(1200);
-
-      if (allProjects.length > 1) {
-        addMsg('assistant',
-          `I can see you're managing ${allProjects.length} projects this cycle. Which one would you like to start with?`,
-          allProjects.map(p => p.name)
-        );
-        setAwaitingSuggestions(allProjects.map(p => p.name));
-        setStage('project_intro');
-      } else {
-        addMsg('assistant',
-          `You're working on **${project.name}**. Let's get started! 🚀\n\nJust do a brain dump for me — tell me everything that happened this quarter. Milestones you hit, any risks or issues that came up, budget situation, wins, challenges — anything and everything. Don't worry about structure, I'll take care of that. 😊`
-        );
-        setStage('memory_dump');
-      }
+      setStage('memory_dump');
     })();
   }, []);
 
   const processMemoryDump = async (dump: string) => {
     setIsProcessing(true);
-    setMemoryDump(dump);
 
-    // Simulate AI processing
     await new Promise(res => setTimeout(res, 2800));
 
-    // Extract information from dump and populate report
-    const updatedFields: string[] = ['overallStatusSummary', 'keyAchievements', 'plannedActivities'];
-    const partialData: Partial<PSRReportData> = {};
-
-    // Simple extraction logic based on keywords in the dump
     const lower = dump.toLowerCase();
+    const partialData: Partial<PSRReportData> = {};
+    const updatedFields: string[] = [
+      'overallStatusSummary', 'keyAchievements', 'plannedActivities',
+      'reportDate', 'overallStatus',
+      'status_dependency', 'status_issues', 'status_resource', 'status_benefits',
+      'status_risks', 'status_budget', 'status_scope', 'status_schedule',
+      'financial_capex', 'financial_opex', 'financial_total',
+    ];
 
-    if (lower.includes('on track') || lower.includes('going well') || lower.includes('good progress') || lower.includes('on schedule')) {
-      partialData.overallStatus = 'on-track';
-      partialData.projectStatus = {
-        dependency: 'on-track', issues: 'on-track', resource: 'on-track',
-        benefits: 'on-track', risks: 'on-track', budget: 'on-track',
-        scope: 'on-track', schedule: 'on-track',
-      };
-    } else if (lower.includes('concern') || lower.includes('risk') || lower.includes('issue') || lower.includes('delay')) {
+    // Derive overall status from dump language
+    const hasOffTrack = lower.includes('off track') || lower.includes('significant') || lower.includes('escalat') || lower.includes('critical');
+    const hasAlert = lower.includes('delay') || lower.includes('risk') || lower.includes('concern') || lower.includes('issue') || lower.includes('behind');
+
+    if (hasOffTrack) {
+      partialData.overallStatus = 'off-track';
+    } else if (hasAlert) {
       partialData.overallStatus = 'alert';
     } else {
       partialData.overallStatus = 'on-track';
     }
 
+    // Build projectStatus — start on-track, degrade specific indicators based on keywords
+    const newStatus: PSRReportData['projectStatus'] = {
+      dependency: 'on-track',
+      issues: lower.includes('issue') || lower.includes('problem') ? 'alert' : 'on-track',
+      resource: lower.includes('resource') || lower.includes('staffing') || lower.includes('headcount') ? 'alert' : 'on-track',
+      benefits: 'on-track',
+      risks: lower.includes('risk') || lower.includes('concern') || lower.includes('escalat') ? 'alert' : 'on-track',
+      budget: lower.includes('over') || lower.includes('overspend') ? 'alert' : 'on-track',
+      scope: lower.includes('scope') && (lower.includes('change') || lower.includes('creep')) ? 'alert' : 'on-track',
+      schedule: lower.includes('delay') || lower.includes('behind') || lower.includes('slip') ? 'alert' : 'on-track',
+    };
+    projectStatusRef.current = newStatus;
+    partialData.projectStatus = { ...newStatus };
+
+    // Populate financial data with realistic ESS values for the quarter
+    partialData.financial = {
+      capex: {
+        baseline: '830.00 K',
+        forecast: lower.includes('over') || lower.includes('overspend') ? '858.00 K' : '824.00 K',
+        forecastVariance: lower.includes('over') ? '-28.00 K (-3.37%)' : '+6.00 K (0.72%)',
+        ytdBaseline: '415.00 K',
+        ytdActual: lower.includes('over') ? '432.00 K' : '411.50 K',
+        actualVariance: lower.includes('over') ? '-17.00 K' : '+3.50 K',
+      },
+      opex: {
+        baseline: '185.00 K',
+        forecast: lower.includes('over') ? '192.00 K' : '183.00 K',
+        forecastVariance: lower.includes('over') ? '-7.00 K (-3.78%)' : '+2.00 K (1.08%)',
+        ytdBaseline: '92.50 K',
+        ytdActual: lower.includes('over') ? '96.00 K' : '91.20 K',
+        actualVariance: lower.includes('over') ? '-3.50 K' : '+1.30 K',
+      },
+      total: {
+        baseline: '1,015.00 K',
+        forecast: lower.includes('over') ? '1,050.00 K' : '1,007.00 K',
+        forecastVariance: lower.includes('over') ? '-35.00 K (-3.45%)' : '+8.00 K (0.79%)',
+        ytdBaseline: '507.50 K',
+        ytdActual: lower.includes('over') ? '528.00 K' : '502.70 K',
+        actualVariance: lower.includes('over') ? '-20.50 K' : '+4.80 K',
+      },
+    };
+
     partialData.overallStatusSummary = generateSummary(dump, project.name);
     partialData.keyAchievements = extractAchievements(dump);
     partialData.plannedActivities = extractPlannedActivities(dump);
     partialData.reportDate = new Date().toLocaleDateString('en-GB');
-    updatedFields.push('reportDate', 'overallStatus');
-
-    // Budget
-    if (lower.includes('budget') || lower.includes('spend') || lower.includes('cost') || lower.includes('$') || lower.includes('capex') || lower.includes('opex')) {
-      updatedFields.push('financial_capex', 'financial_opex', 'financial_total');
-    }
 
     onReportUpdate(partialData, updatedFields);
     setIsProcessing(false);
 
     addMsg('assistant',
-      `✨ Done! I've filled in the main sections of your report based on what you shared. You can see the report updating on the right panel.\n\nI have a few follow-up questions to complete the remaining sections — I'll go one at a time and give you some suggested answers based on your past reports. Ready?`
+      `I have filled in the key sections of your report based on what you shared. You should see the report updating on the right.\n\nI have a few follow-up questions to lock in the remaining details. I'll go through them one at a time and offer some suggested answers. Ready to continue?`
     );
 
     await new Promise(res => setTimeout(res, 800));
@@ -214,13 +230,14 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
 
   const askOverallStatus = async (currentStatus: string) => {
     setStage('followup_overall_status');
+    const statusLabel = currentStatus === 'on-track' ? 'On Track' : currentStatus === 'alert' ? 'Alert' : 'Off Track';
     const suggestions = [
-      '✅ On Track — all key indicators green',
-      '⚠️ Alert — one or two areas need attention',
-      '🔴 Off Track — significant concerns to escalate',
+      'On Track — all key indicators green',
+      'Alert — one or two areas need attention',
+      'Off Track — significant concerns to escalate',
     ];
     addMsg('assistant',
-      `What is the **overall project status** this quarter? Based on what you told me, I've set it to "${currentStatus === 'on-track' ? 'On Track' : currentStatus === 'alert' ? 'Alert' : 'Off Track'}" — does that sound right?`,
+      `What is the overall project status this quarter? Based on what you described, I have set it to "${statusLabel}". Does that sound right?`,
       suggestions
     );
     setAwaitingSuggestions(suggestions);
@@ -228,14 +245,13 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
 
   const askRisksUpdate = async () => {
     setStage('followup_risks');
-    const past = project.pastReports[0]?.data;
-    const suggestions = past?.risks.slice(0, 3).map(r => `${r.id}: ${r.name} → Now rated ${r.residualRisk}`) || [
-      'No new risks this quarter',
-      'Existing risks being managed',
-      'New risk identified — need to add details',
+    const suggestions = [
+      'No change — existing risks being managed within tolerance',
+      'Risk severity increased — one or more risks escalated',
+      'New risk identified this quarter',
     ];
     addMsg('assistant',
-      `Any changes to the **risk register** this quarter? Here are the active risks from last period — have any changed in severity, or are there new ones to add?`,
+      `Any changes to the risk register this quarter? Here are the active risks carried over from last period:\n\n- R101: Phase 3 vendor delivery delay (HIGH)\n- R102: Skilled resource availability for Phase 3 (MEDIUM)\n\nHave any changed in severity, or are there new risks to add?`,
       suggestions
     );
     setAwaitingSuggestions(suggestions);
@@ -244,12 +260,12 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
   const askBudgetUpdate = async () => {
     setStage('followup_budget');
     const suggestions = [
-      'Budget on track — within 5% of forecast',
+      'On track — within 3% of FY forecast',
       'Slightly over forecast — corrective action in place',
       'Significantly over forecast — requires approval',
     ];
     addMsg('assistant',
-      `How is the **budget tracking** this quarter? What's the general position vs. the FY baseline?`,
+      `How is the budget tracking this quarter? I have pre-filled figures based on what you described. Please confirm the general position.`,
       suggestions
     );
     setAwaitingSuggestions(suggestions);
@@ -263,7 +279,7 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
       'Schedule slippage — key milestone impacted',
     ];
     addMsg('assistant',
-      `How is the **schedule** looking? Did you hit your planned milestones for Q1?`,
+      `How is the schedule looking? Did Phase 3 IAM Rollout commence as planned?`,
       suggestions
     );
     setAwaitingSuggestions(suggestions);
@@ -272,12 +288,12 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
   const askNextSteps = async () => {
     setStage('followup_next_steps');
     const suggestions = [
-      'Continue with Phase 4 rollout as planned',
-      'Resolve outstanding risks before next phase',
-      'Conduct stakeholder review and get sign-off',
+      'Continue Phase 3 IAM rollout and SOC integration as planned',
+      'Resolve vendor delay before progressing Phase 3 further',
+      'Conduct stakeholder review and update delivery plan',
     ];
     addMsg('assistant',
-      `Almost done! 🎉 What are the **key priorities and planned activities** for Q2 2026 (next reporting period)?`,
+      `Last question. What are the key priorities and planned activities for next quarter (April – June 2026)?`,
       suggestions
     );
     setAwaitingSuggestions(suggestions);
@@ -285,15 +301,18 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
 
   const finaliseReport = async (nextSteps: string) => {
     setStage('complete');
-    const updateData: Partial<PSRReportData> = {
-      plannedActivities: nextSteps.startsWith('Continue') ? 'Continue Phase 4 rollout. Maintain risk mitigation cadence. Conduct Q2 stakeholder reviews.'
-        : nextSteps.startsWith('Resolve') ? 'Resolve outstanding risks. Complete pending regulatory approvals. Prepare for Phase 4 commencement.'
-        : 'Conduct stakeholder review. Obtain executive sign-off on Phase 4 approach. Update project plan.',
-    };
-    onReportUpdate(updateData, ['plannedActivities']);
+
+    let plannedText = 'Continue Phase 3 IAM rollout and SOC integration. Begin user awareness training program. Maintain risk monitoring cadence with vendor.';
+    if (nextSteps.includes('vendor') || nextSteps.includes('Resolve')) {
+      plannedText = 'Resolve Phase 3 vendor delivery delay. Resume IAM rollout once vendor SLA confirmed. Maintain weekly risk reviews. Update Phase 3 delivery plan.';
+    } else if (nextSteps.includes('stakeholder') || nextSteps.includes('review')) {
+      plannedText = 'Conduct Q2 stakeholder review. Update Phase 3 delivery plan with revised milestones. Obtain steering committee sign-off. Progress SOC integration scoping.';
+    }
+
+    onReportUpdate({ plannedActivities: plannedText }, ['plannedActivities']);
 
     addMsg('assistant',
-      `🎉 Your Project Status Report is complete! Here's a summary of what I've filled in:\n\n✅ Overall Status Summary\n✅ Project Status Indicators\n✅ Key Achievements\n✅ Planned Activities\n✅ Risks & Issues updated\n\nYou can now review the full report on the right panel. When you're happy with it, hit **Submit to PMO** or download it in your preferred format. Great work! 🚀`
+      `Your Project Status Report is complete. Here is a summary of what has been filled in:\n\n- Overall Status and Summary\n- All Project Status Indicators\n- Key Achievements\n- Planned Activities\n- Financial Snapshot\n- Risk Register\n\nPlease review the full report on the right. When you are satisfied, use the Submit to PMO button or download in your preferred format.`
     );
     onComplete();
   };
@@ -301,7 +320,6 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
   const handleSuggestionSelect = async (suggestion: string) => {
     if (suggestion === '__custom__') {
       setAwaitingSuggestions(null);
-      setAwaitingCustom(true);
       inputRef.current?.focus();
       return;
     }
@@ -309,45 +327,53 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
     setAwaitingSuggestions(null);
     addMsg('user', suggestion);
 
-    if (stage === 'project_intro') {
-      const proj = allProjects.find(p => p.name === suggestion);
-      if (proj) {
-        onProjectSelect(proj.id);
-        await new Promise(res => setTimeout(res, 400));
-        addMsg('assistant',
-          `Great choice! Let's work on **${proj.name}**.\n\nI've loaded the past 3 reports in the right panel for reference. Now — tell me everything that happened this quarter. Just do a brain dump and I'll structure it for you! 🧠`
-        );
-        setStage('memory_dump');
-      }
-    } else if (stage === 'followup_overall_status') {
-      const statusMap: Record<string, PSRReportData['overallStatus']> = {
-        '✅': 'on-track', '⚠️': 'alert', '🔴': 'off-track',
-      };
-      const emoji = suggestion.split(' ')[0];
-      const status = statusMap[emoji] || 'on-track';
+    if (stage === 'followup_overall_status') {
+      const status: PSRReportData['overallStatus'] =
+        suggestion.includes('On Track') ? 'on-track' :
+        suggestion.includes('Alert') ? 'alert' : 'off-track';
       const statusLabel = suggestion.includes('On Track') ? 'On Track' : suggestion.includes('Alert') ? 'Alert' : 'Off Track';
       onReportUpdate({ overallStatus: status }, ['overallStatus']);
-
-      addMsg('assistant', `Got it — overall status set to **${statusLabel}**. ✅`);
+      addMsg('assistant', `Overall status confirmed as ${statusLabel}.`);
       await new Promise(res => setTimeout(res, 600));
       await askRisksUpdate();
+
     } else if (stage === 'followup_risks') {
-      onReportUpdate({}, ['risks']);
-      addMsg('assistant', `Risks noted! I'll update the register accordingly. ✅`);
+      let riskStatus: PSRReportData['projectStatus']['risks'] = 'on-track';
+      if (suggestion.includes('escalated') || suggestion.includes('increased')) riskStatus = 'alert';
+      if (suggestion.includes('New risk')) riskStatus = 'alert';
+
+      // Use the ref — never spread from stale props
+      const updated = { ...projectStatusRef.current, risks: riskStatus };
+      projectStatusRef.current = updated;
+      onReportUpdate({ projectStatus: { ...updated } }, ['status_risks', 'risks']);
+      addMsg('assistant', `Risk register noted and updated.`);
       await new Promise(res => setTimeout(res, 600));
       await askBudgetUpdate();
+
     } else if (stage === 'followup_budget') {
-      const budgetStatus = suggestion.includes('on track') ? 'on-track' : suggestion.includes('Slightly') ? 'alert' : 'off-track';
-      onReportUpdate({ projectStatus: { ...project.currentReport.projectStatus, budget: budgetStatus } }, ['status_budget', 'financial_capex', 'financial_opex', 'financial_total']);
-      addMsg('assistant', `Budget status recorded. ✅`);
+      const budgetStatus: PSRReportData['projectStatus']['budget'] =
+        suggestion.includes('on track') || suggestion.includes('On track') ? 'on-track' :
+        suggestion.includes('Slightly') ? 'alert' : 'off-track';
+
+      const updated = { ...projectStatusRef.current, budget: budgetStatus };
+      projectStatusRef.current = updated;
+      onReportUpdate({ projectStatus: { ...updated } }, ['status_budget', 'financial_capex', 'financial_opex', 'financial_total']);
+      addMsg('assistant', `Budget status recorded.`);
       await new Promise(res => setTimeout(res, 600));
       await askScheduleUpdate();
+
     } else if (stage === 'followup_schedule') {
-      const schedStatus = suggestion.includes('On schedule') ? 'on-track' : suggestion.includes('Minor') ? 'alert' : 'off-track';
-      onReportUpdate({ projectStatus: { ...project.currentReport.projectStatus, schedule: schedStatus } }, ['status_schedule']);
-      addMsg('assistant', `Schedule status updated. ✅`);
+      const schedStatus: PSRReportData['projectStatus']['schedule'] =
+        suggestion.includes('On schedule') ? 'on-track' :
+        suggestion.includes('Minor') ? 'alert' : 'off-track';
+
+      const updated = { ...projectStatusRef.current, schedule: schedStatus };
+      projectStatusRef.current = updated;
+      onReportUpdate({ projectStatus: { ...updated } }, ['status_schedule']);
+      addMsg('assistant', `Schedule status updated.`);
       await new Promise(res => setTimeout(res, 600));
       await askNextSteps();
+
     } else if (stage === 'followup_next_steps') {
       await finaliseReport(suggestion);
     }
@@ -357,41 +383,53 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
     const text = inputValue.trim();
     if (!text) return;
     setInputValue('');
-    setAwaitingCustom(false);
     setAwaitingSuggestions(null);
+
+    // Reset textarea height
+    if (inputRef.current) {
+      inputRef.current.style.height = '22px';
+    }
 
     addMsg('user', text);
 
     const currentStage = stage;
 
     if (currentStage === 'memory_dump') {
-      addMsg('assistant', 'Thanks for sharing! Give me a moment while I process this and fill in your report... 🔄', undefined);
+      addMsg('assistant', 'Thank you. Give me a moment while I process this and fill in your report.');
       await new Promise(res => setTimeout(res, 400));
       setIsProcessing(true);
       await processMemoryDump(text);
-    } else if (currentStage === 'project_intro') {
-      const proj = allProjects.find(p => p.name.toLowerCase() === text.toLowerCase()) || allProjects[0];
-      onProjectSelect(proj.id);
-      await new Promise(res => setTimeout(res, 400));
-      addMsg('assistant',
-        `Great choice! Let's work on **${proj.name}**.\n\nI've loaded the past 3 reports in the right panel for reference. Now — tell me everything that happened this quarter. Just do a brain dump and I'll structure it for you! 🧠`
-      );
-      setStage('memory_dump');
     } else if (currentStage === 'followup_overall_status') {
-      await handleSuggestionSelect(text.toLowerCase().includes('on track') ? '✅ On Track — all key indicators green' : '⚠️ Alert — one or two areas need attention');
+      const status: PSRReportData['overallStatus'] =
+        text.toLowerCase().includes('on track') ? 'on-track' :
+        text.toLowerCase().includes('off track') ? 'off-track' : 'alert';
+      onReportUpdate({ overallStatus: status }, ['overallStatus']);
+      addMsg('assistant', `Overall status noted.`);
+      await new Promise(res => setTimeout(res, 600));
+      await askRisksUpdate();
     } else if (currentStage === 'followup_risks') {
-      onReportUpdate({}, ['risks']);
-      addMsg('assistant', `Got it — risks updated. ✅`);
+      const updated = { ...projectStatusRef.current, risks: 'alert' as const };
+      projectStatusRef.current = updated;
+      onReportUpdate({ projectStatus: { ...updated } }, ['status_risks', 'risks']);
+      addMsg('assistant', `Risk register updated.`);
       await new Promise(res => setTimeout(res, 600));
       await askBudgetUpdate();
     } else if (currentStage === 'followup_budget') {
-      onReportUpdate({}, ['status_budget']);
-      addMsg('assistant', `Budget information noted. ✅`);
+      const budgetStatus: PSRReportData['projectStatus']['budget'] =
+        text.toLowerCase().includes('over') ? 'alert' : 'on-track';
+      const updated = { ...projectStatusRef.current, budget: budgetStatus };
+      projectStatusRef.current = updated;
+      onReportUpdate({ projectStatus: { ...updated } }, ['status_budget']);
+      addMsg('assistant', `Budget information noted.`);
       await new Promise(res => setTimeout(res, 600));
       await askScheduleUpdate();
     } else if (currentStage === 'followup_schedule') {
-      onReportUpdate({}, ['status_schedule']);
-      addMsg('assistant', `Schedule status noted. ✅`);
+      const schedStatus: PSRReportData['projectStatus']['schedule'] =
+        text.toLowerCase().includes('delay') || text.toLowerCase().includes('behind') ? 'alert' : 'on-track';
+      const updated = { ...projectStatusRef.current, schedule: schedStatus };
+      projectStatusRef.current = updated;
+      onReportUpdate({ projectStatus: { ...updated } }, ['status_schedule']);
+      addMsg('assistant', `Schedule status noted.`);
       await new Promise(res => setTimeout(res, 600));
       await askNextSteps();
     } else if (currentStage === 'followup_next_steps') {
@@ -467,7 +505,7 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
               stage === 'complete'
                 ? 'Report submitted — ask me anything else...'
                 : stage === 'memory_dump'
-                  ? 'E.g., Build a portfolio status report for Q1...'
+                  ? 'E.g., Phase 3 IAM rollout started, budget on track, vendor delay on identity module...'
                   : 'Type your answer...'
             }
             disabled={isProcessing}
@@ -486,32 +524,35 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
           </button>
         </div>
         {stage === 'complete' && (
-          <p className="text-[11px] text-emerald-600 text-center mt-2 font-medium">✅ Report complete — review on the right, then submit.</p>
+          <p className="text-[11px] text-emerald-600 text-center mt-2 font-medium">Report complete — review on the right, then submit.</p>
         )}
       </div>
     </div>
   );
 }
 
-// Helper functions for report generation
+// Helper functions
 function generateSummary(dump: string, projectName: string): string {
   const lower = dump.toLowerCase();
   const hasRisks = lower.includes('risk') || lower.includes('concern') || lower.includes('issue');
-  const hasBudget = lower.includes('budget') || lower.includes('cost') || lower.includes('spend');
-  const hasSchedule = lower.includes('delay') || lower.includes('schedule') || lower.includes('milestone');
+  const hasDelay = lower.includes('delay') || lower.includes('behind') || lower.includes('slip');
+  const hasBudget = lower.includes('budget') || lower.includes('cost') || lower.includes('spend') || lower.includes('forecast');
 
-  let summary = `Q1 2026 reporting period for ${projectName}. `;
+  let summary = `March 2026 reporting period for ${projectName}. `;
 
-  if (lower.includes('on track') || lower.includes('going well') || (!hasRisks && !hasSchedule)) {
+  if (!hasRisks && !hasDelay) {
     summary += 'Project progressing as planned with key deliverables on track. ';
   } else {
-    summary += 'Project facing some headwinds this quarter with areas requiring attention. ';
+    summary += 'Project progressing with some areas requiring active management. ';
   }
 
-  if (hasBudget) summary += 'Budget position being monitored closely. ';
+  if (hasBudget) summary += 'Budget position being monitored. ';
   if (hasRisks) summary += 'Risk register reviewed and mitigation actions progressing. ';
-  if (lower.includes('milestone') || lower.includes('complet') || lower.includes('achieved') || lower.includes('deliverd') || lower.includes('delivered')) {
-    summary += 'Key milestones achieved during the quarter. ';
+  if (hasDelay) summary += 'Schedule pressures noted with recovery plans in place. ';
+
+  const completionWords = ['completed', 'achieved', 'delivered', 'launched', 'signed', 'approved', 'finalised', 'live'];
+  if (completionWords.some(w => lower.includes(w))) {
+    summary += 'Key milestones achieved during the quarter.';
   }
 
   return summary.trim();
@@ -519,24 +560,24 @@ function generateSummary(dump: string, projectName: string): string {
 
 function extractAchievements(dump: string): string {
   const sentences = dump.split(/[.!?]+/).filter(s => s.trim().length > 10);
-  const achievementKeywords = ['completed', 'achieved', 'delivered', 'launched', 'signed', 'approved', 'finalised', 'onboard', 'success', 'hit', 'milestone'];
+  const keywords = ['completed', 'achieved', 'delivered', 'launched', 'signed', 'approved', 'finalised', 'live', 'secured', 'passed', 'success'];
   const achievements = sentences.filter(s =>
-    achievementKeywords.some(kw => s.toLowerCase().includes(kw))
+    keywords.some(kw => s.toLowerCase().includes(kw))
   ).slice(0, 3);
 
   return achievements.length > 0
     ? achievements.map(s => s.trim()).join('. ') + '.'
-    : 'Q1 activities progressed as planned. Key deliverables advanced toward completion. Stakeholder engagement maintained throughout the quarter.';
+    : 'Quarter activities progressed as planned. Key deliverables advanced toward completion. Stakeholder engagement maintained throughout the period.';
 }
 
 function extractPlannedActivities(dump: string): string {
   const sentences = dump.split(/[.!?]+/).filter(s => s.trim().length > 10);
-  const plannedKeywords = ['next', 'plan', 'upcoming', 'will', 'intend', 'q2', 'april', 'may', 'june'];
+  const keywords = ['next', 'plan', 'upcoming', 'will', 'intend', 'q2', 'april', 'may', 'june', 'phase 3', 'focus'];
   const planned = sentences.filter(s =>
-    plannedKeywords.some(kw => s.toLowerCase().includes(kw))
+    keywords.some(kw => s.toLowerCase().includes(kw))
   ).slice(0, 3);
 
   return planned.length > 0
     ? planned.map(s => s.trim()).join('. ') + '.'
-    : 'Continue progressing key deliverables per the project plan. Maintain risk monitoring cadence. Conduct Q2 stakeholder reviews.';
+    : 'Continue Phase 3 delivery per the project plan. Maintain risk monitoring cadence. Conduct Q2 stakeholder reviews.';
 }

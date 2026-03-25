@@ -60,10 +60,10 @@ function DownloadMenu() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const formats: Array<{ fmt: DownloadFormat; label: string; icon: string }> = [
-    { fmt: 'pdf', label: 'Download as PDF', icon: '📄' },
-    { fmt: 'word', label: 'Download as Word', icon: '📝' },
-    { fmt: 'pptx', label: 'Download as PowerPoint', icon: '📊' },
+  const formats: Array<{ fmt: DownloadFormat; label: string }> = [
+    { fmt: 'pdf', label: 'Download as PDF' },
+    { fmt: 'word', label: 'Download as Word' },
+    { fmt: 'pptx', label: 'Download as PowerPoint' },
   ];
 
   const handleDownload = (fmt: DownloadFormat) => {
@@ -88,13 +88,13 @@ function DownloadMenu() {
       </button>
       {open && (
         <div className="absolute bottom-full mb-2 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 min-w-[200px] z-10">
-          {formats.map(({ fmt, label, icon }) => (
+          {formats.map(({ fmt, label }) => (
             <button
               key={fmt}
               onClick={() => handleDownload(fmt)}
               className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors"
             >
-              <span>{icon}</span> {label}
+              {label}
             </button>
           ))}
         </div>

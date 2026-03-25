@@ -68,16 +68,7 @@ export default function App() {
             <p className="text-[10px] text-slate-500">March 2026 · PSR due 8 April 2026</p>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <span className="text-xs text-slate-500">Project:</span>
-            <select
-              value={selectedProjectId}
-              onChange={e => handleProjectSelect(e.target.value)}
-              className="text-xs text-slate-700 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#2a9fd6]"
-            >
-              {PROJECTS.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+            <span className="text-xs text-slate-500 font-medium">{selectedProject.name}</span>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#eef4fb] border border-[#c8def0]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#2a9fd6]" />
               <span className="text-[11px] text-[#2a9fd6] font-medium">Mar 2026 · 01 Mar – 31 Mar 2026</span>
