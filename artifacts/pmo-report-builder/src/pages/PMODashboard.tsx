@@ -37,6 +37,17 @@ const TEMPLATE_OPTIONS: Array<{ id: SummaryTemplate; label: string; description:
   { id: 'exec-snapshot', label: 'Exec Snapshot', description: 'Pulse-style metrics with context bullets' },
 ];
 
+const EXECUTIVES = [
+  { id: 'e1', name: 'Margaret Chen', title: 'Executive Director', email: 'margaret.chen@strategydotzero.gov' },
+  { id: 'e2', name: 'David Morrison', title: 'Deputy Secretary', email: 'david.morrison@strategydotzero.gov' },
+  { id: 'e3', name: 'Amanda Forsythe', title: 'Chief Executive Officer', email: 'amanda.forsythe@strategydotzero.gov' },
+  { id: 'e4', name: 'Robert Kim', title: 'Deputy Director General', email: 'robert.kim@strategydotzero.gov' },
+  { id: 'e5', name: 'Sarah Blackwood', title: 'Chief Operating Officer', email: 'sarah.blackwood@strategydotzero.gov' },
+  { id: 'e6', name: 'Thomas Nguyen', title: 'Assistant Secretary', email: 'thomas.nguyen@strategydotzero.gov' },
+];
+
+type Executive = typeof EXECUTIVES[0];
+
 function EyeIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4">
@@ -409,6 +420,159 @@ function ExecSnapshotContent({ ngiSubmitted }: { ngiSubmitted: boolean }) {
   );
 }
 
+function RecipientPicker({ recipients, onChange }: {
+  recipients: Executive[];
+  onChange: (r: Executive[]) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const suggestions = EXECUTIVES.filter(e =>
+    !recipients.some(r => r.id === e.id) &&
+    (e.name.toLowerCase().includes(query.toLowerCase()) || e.title.toLowerCase().includes(query.toLowerCase()))
+  );
+
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const select = (exec: Executive) => {
+    onChange([...recipients, exec]);
+    setQuery('');
+    inputRef.current?.focus();
+  };
+
+  const remove = (id: string) => {
+    onChange(recipients.filter(r => r.id !== id));
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div
+        className={`flex flex-wrap gap-1.5 items-center min-h-[38px] px-2.5 py-1.5 rounded-lg border transition-colors cursor-text
+          ${open ? 'border-[#2a9fd6] ring-1 ring-[#2a9fd6]' : 'border-slate-200 hover:border-slate-300'}`}
+        onClick={() => { setOpen(true); inputRef.current?.focus(); }}
+      >
+        {recipients.map(r => (
+          <span key={r.id} className="inline-flex items-center gap-1 bg-[#e0f0fb] text-[#1a5a8a] text-xs font-medium pl-2.5 pr-1.5 py-0.5 rounded-full">
+            {r.name}
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); remove(r.id); }}
+              className="w-3.5 h-3.5 rounded-full bg-[#bcd8ef] hover:bg-[#a0c8e5] text-[#1a5a8a] flex items-center justify-center text-[10px] font-bold leading-none"
+            >×</button>
+          </span>
+        ))}
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder={recipients.length === 0 ? 'Type to search executives…' : ''}
+          className="flex-1 min-w-[140px] text-xs text-slate-700 outline-none placeholder-slate-400 bg-transparent py-0.5"
+        />
+      </div>
+      {open && (query.length > 0 || recipients.length === 0) && suggestions.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-20 overflow-hidden">
+          {suggestions.map(exec => (
+            <button
+              key={exec.id}
+              type="button"
+              onMouseDown={e => { e.preventDefault(); select(exec); }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-[#eef4fb] transition-colors"
+            >
+              <div className="w-7 h-7 rounded-full bg-[#1a2456] flex items-center justify-center text-white text-xs font-bold shrink-0">
+                {exec.name.charAt(0)}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-slate-800">{exec.name}</div>
+                <div className="text-[10px] text-slate-500">{exec.title}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      {open && query.length > 0 && suggestions.length === 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-20 px-4 py-3 text-xs text-slate-400 italic">
+          No matching executives found.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExecDownloadMenu({ template, projectCount }: { template: string; projectCount: number }) {
+  const [open, setOpen] = useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const formats = [
+    { label: 'PDF Document', ext: 'pdf', icon: '📄' },
+    { label: 'Word Document', ext: 'docx', icon: '📝' },
+    { label: 'PowerPoint Deck', ext: 'pptx', icon: '📊' },
+  ];
+
+  const handleDownload = (ext: string) => {
+    alert(`Downloading Exec Summary as ${ext.toUpperCase()}… (demo — export would be generated in production)`);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="px-4 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors flex items-center gap-2"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        </svg>
+        Download
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3 h-3">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute bottom-full mb-2 right-0 bg-white border border-slate-200 rounded-xl shadow-xl py-1 min-w-[200px] z-20">
+          <div className="px-3 py-1.5 border-b border-slate-100">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Export Format</p>
+          </div>
+          {formats.map(f => (
+            <button
+              key={f.ext}
+              type="button"
+              onClick={() => handleDownload(f.ext)}
+              className="w-full text-left px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors"
+            >
+              <span className="text-base">{f.icon}</span>
+              <div>
+                <div className="text-xs font-medium">{f.label}</div>
+                <div className="text-[10px] text-slate-400">.{f.ext} · {projectCount} project{projectCount !== 1 ? 's' : ''} included</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ExecSummaryModal({ projects, onClose, onSent }: {
   projects: DashboardProject[];
   onClose: () => void;
@@ -420,6 +584,7 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
   const [generated, setGenerated] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [recipients, setRecipients] = useState<Executive[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     new Set(projects.filter(p => p.reportingStatus === 'approved' || p.reportingStatus === 'sent').map(p => p.id))
   );
@@ -583,19 +748,28 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
                 <ExecSnapshotContent ngiSubmitted={ngiSubmitted} />
               )}
 
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-slate-500">
-                  To: <span className="font-medium text-slate-700">Margaret Chen, Executive Director</span>
+              <div className="border-t border-slate-200 pt-4 space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+                    To <span className="text-red-500">*</span>
+                  </label>
+                  <RecipientPicker recipients={recipients} onChange={setRecipients} />
+                  {recipients.length === 0 && (
+                    <p className="text-[10px] text-amber-600 mt-1">At least one recipient is required to send.</p>
+                  )}
                 </div>
-                <button
-                  onClick={handleSend}
-                  disabled={sending}
-                  className="px-5 py-2 rounded-lg bg-[#1a2456] hover:bg-[#232f6b] text-white text-sm font-semibold transition-colors flex items-center gap-2"
-                >
-                  {sending ? (
-                    <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending…</>
-                  ) : <><SendUpIcon /> Send to Executive</>}
-                </button>
+                <div className="flex items-center justify-end gap-2">
+                  <ExecDownloadMenu template={template} projectCount={rows.length || selectedIds.size} />
+                  <button
+                    onClick={handleSend}
+                    disabled={sending || recipients.length === 0}
+                    className="px-5 py-2 rounded-lg bg-[#1a2456] hover:bg-[#232f6b] text-white text-sm font-semibold transition-colors flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {sending ? (
+                      <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending…</>
+                    ) : <><SendUpIcon /> Send to Executive</>}
+                  </button>
+                </div>
               </div>
             </>
           ) : (
@@ -604,9 +778,13 @@ function ExecSummaryModal({ projects, onClose, onSent }: {
                 <span className="text-green-600 text-3xl">✓</span>
               </div>
               <p className="text-lg font-bold text-slate-800">Executive Summary Sent</p>
-              <p className="text-sm text-slate-500 mt-1">Margaret Chen (Executive Director) has been notified with the March 2026 portfolio summary.</p>
+              <p className="text-sm text-slate-500 mt-1">
+                {recipients.length === 1
+                  ? `${recipients[0].name} has been notified with the March 2026 portfolio summary.`
+                  : `${recipients.length} recipients have been notified with the March 2026 portfolio summary.`}
+              </p>
               <div className="mt-4 inline-block bg-slate-50 border border-slate-200 rounded-xl px-6 py-3 text-xs text-slate-600 text-left">
-                <p>✉ Sent to: <strong>margaret.chen@strategydotzero.gov</strong></p>
+                <p>✉ Sent to: <strong>{recipients.map(r => r.email).join(', ')}</strong></p>
                 <p className="mt-1">📎 Format: {selectedTemplate.label} · {rows.length || 'All'} projects covered</p>
                 <p className="mt-1">⏱ Sent: {new Date().toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })} at {new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}</p>
               </div>
