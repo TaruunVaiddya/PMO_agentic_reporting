@@ -106,11 +106,14 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const initialized = useRef(false);
-  // Tracks the live projectStatus so follow-up handlers never spread from stale props
+  const msgCounter = useRef(0);
+  // Tracks live accumulated state so follow-up handlers never spread from stale props
   const projectStatusRef = useRef<PSRReportData['projectStatus']>({ ...DEFAULT_PROJECT_STATUS });
+  const commentsRef = useRef<PSRReportData['projectStatusComments']>({});
 
   const addMsg = (role: 'assistant' | 'user', content: string, suggestions?: string[]) => {
-    const msg: ChatMessage = { id: Date.now().toString(), role, content, timestamp: new Date(), suggestions };
+    msgCounter.current += 1;
+    const msg: ChatMessage = { id: `msg-${msgCounter.current}`, role, content, timestamp: new Date(), suggestions };
     setMessages(prev => [...prev, msg]);
     return msg;
   };
@@ -154,12 +157,13 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
 
     const lower = dump.toLowerCase();
     const partialData: Partial<PSRReportData> = {};
+    // Only include fields we're actually setting here — risks/budget/schedule come from follow-up questions
     const updatedFields: string[] = [
       'overallStatusSummary', 'keyAchievements', 'plannedActivities',
       'reportDate', 'overallStatus',
-      'status_dependency', 'status_issues', 'status_resource', 'status_benefits',
-      'status_risks', 'status_budget', 'status_scope', 'status_schedule',
+      'status_dependency', 'status_issues', 'status_resource', 'status_benefits', 'status_scope',
       'financial_capex', 'financial_opex', 'financial_total',
+      'risks', 'endProducts', 'managementProducts',
     ];
 
     // Derive overall status from dump language
@@ -174,19 +178,85 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
       partialData.overallStatus = 'on-track';
     }
 
-    // Build projectStatus — start on-track, degrade specific indicators based on keywords
+    // Build projectStatus — only set indicators we can infer from the dump.
+    // risks, budget, schedule remain not-tracked until the user answers those specific questions.
     const newStatus: PSRReportData['projectStatus'] = {
       dependency: 'on-track',
       issues: lower.includes('issue') || lower.includes('problem') ? 'alert' : 'on-track',
       resource: lower.includes('resource') || lower.includes('staffing') || lower.includes('headcount') ? 'alert' : 'on-track',
       benefits: 'on-track',
-      risks: lower.includes('risk') || lower.includes('concern') || lower.includes('escalat') ? 'alert' : 'on-track',
-      budget: lower.includes('over') || lower.includes('overspend') ? 'alert' : 'on-track',
+      risks: 'not-tracked',     // set after risks follow-up question
+      budget: 'not-tracked',    // set after budget follow-up question
       scope: lower.includes('scope') && (lower.includes('change') || lower.includes('creep')) ? 'alert' : 'on-track',
-      schedule: lower.includes('delay') || lower.includes('behind') || lower.includes('slip') ? 'alert' : 'on-track',
+      schedule: 'not-tracked',  // set after schedule follow-up question
     };
     projectStatusRef.current = newStatus;
+    commentsRef.current = {};
     partialData.projectStatus = { ...newStatus };
+    partialData.projectStatusComments = {};
+
+    // Pre-fill risk treatments from the dump context
+    const vendorDelay = lower.includes('vendor') || lower.includes('delay') || lower.includes('iam');
+    partialData.risks = [
+      {
+        id: 'R101',
+        name: 'Phase 3 vendor delivery delay — IAM module',
+        actualRisk: 'HIGH',
+        treatment: vendorDelay
+          ? 'Escalated to vendor account manager. Weekly delivery reviews in place. Recovery plan absorbs delay within Phase 3 tolerance.'
+          : 'Being monitored. Vendor engagement ongoing.',
+        residualRisk: vendorDelay ? 'MEDIUM' : 'Not Rated',
+      },
+      {
+        id: 'R102',
+        name: 'Skilled resource availability for Phase 3',
+        actualRisk: 'MEDIUM',
+        treatment: lower.includes('resource') || lower.includes('team')
+          ? 'Resource plan confirmed for Phase 3. Two additional security engineers engaged to supplement delivery team.'
+          : 'Resource requirements being assessed for Phase 3 commencement.',
+        residualRisk: 'LOW',
+      },
+    ];
+
+    // Pre-fill end products with initial completion based on dump context
+    const phase3Started = lower.includes('phase 3') || lower.includes('iam') || lower.includes('identity');
+    const socStarted = lower.includes('soc') || lower.includes('security operation');
+    partialData.endProducts = [
+      {
+        name: 'Identity & Access Management Platform',
+        owner: 'Marcus Tanaka',
+        startDate: '01/03/2026',
+        endDate: '30/04/2026',
+        status: phase3Started ? 'In Progress' : 'Not Started',
+        completion: phase3Started ? 15 : 0,
+      },
+      {
+        name: 'SOC Integration Blueprint',
+        owner: 'Priya Nair',
+        startDate: '01/03/2026',
+        endDate: '30/04/2026',
+        status: socStarted ? 'In Progress' : 'Not Started',
+        completion: socStarted ? 20 : 0,
+      },
+      {
+        name: 'Security Awareness Training Program',
+        owner: 'Lisa Chow',
+        startDate: '01/04/2026',
+        endDate: '31/05/2026',
+        status: 'Not Started',
+        completion: 0,
+      },
+    ];
+    partialData.managementProducts = [
+      {
+        name: 'Phase 3 Updated Delivery Plan',
+        owner: 'Neil Okafor',
+        startDate: '01/03/2026',
+        endDate: '14/04/2026',
+        status: 'In Progress',
+        completion: 40,
+      },
+    ];
 
     // Populate financial data with realistic ESS values for the quarter
     partialData.financial = {
@@ -313,7 +383,35 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
       plannedText = 'Conduct Q2 stakeholder review. Update Phase 3 delivery plan with revised milestones. Obtain steering committee sign-off. Progress SOC integration scoping.';
     }
 
-    onReportUpdate({ plannedActivities: plannedText }, ['plannedActivities']);
+    const vendorResolve = nextSteps.includes('vendor') || nextSteps.includes('Resolve');
+    const finalEndProducts: PSRReportData['endProducts'] = [
+      {
+        name: 'Identity & Access Management Platform',
+        owner: 'Marcus Tanaka',
+        startDate: '01/03/2026',
+        endDate: '30/04/2026',
+        status: vendorResolve ? 'On Hold' : 'In Progress',
+        completion: vendorResolve ? 15 : 25,
+      },
+      {
+        name: 'SOC Integration Blueprint',
+        owner: 'Priya Nair',
+        startDate: '01/03/2026',
+        endDate: '30/04/2026',
+        status: 'In Progress',
+        completion: 30,
+      },
+      {
+        name: 'Security Awareness Training Program',
+        owner: 'Lisa Chow',
+        startDate: '01/04/2026',
+        endDate: '31/05/2026',
+        status: 'Not Started',
+        completion: 0,
+      },
+    ];
+
+    onReportUpdate({ plannedActivities: plannedText, endProducts: finalEndProducts }, ['plannedActivities', 'endProducts']);
 
     addMsg('assistant',
       `Your Project Status Report is complete. Here is a summary of what has been filled in:\n\n- Overall Status and Summary\n- All Project Status Indicators\n- Key Achievements\n- Planned Activities\n- Financial Snapshot\n- Risk Register\n\nPlease review the full report on the right. When you are satisfied, use the Submit to PMO button or download in your preferred format.`
@@ -342,26 +440,70 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
       await askRisksUpdate();
 
     } else if (stage === 'followup_risks') {
-      let riskStatus: PSRReportData['projectStatus']['risks'] = 'on-track';
-      if (suggestion.includes('escalated') || suggestion.includes('increased')) riskStatus = 'alert';
-      if (suggestion.includes('New risk')) riskStatus = 'alert';
+      const noChange = suggestion.includes('No change');
+      const escalated = suggestion.includes('escalated') || suggestion.includes('increased');
+      const newRisk = suggestion.includes('New risk');
+      const riskStatus: PSRReportData['projectStatus']['risks'] = noChange ? 'on-track' : 'alert';
 
-      // Use the ref — never spread from stale props
-      const updated = { ...projectStatusRef.current, risks: riskStatus };
-      projectStatusRef.current = updated;
-      onReportUpdate({ projectStatus: { ...updated } }, ['status_risks', 'risks']);
-      addMsg('assistant', `Risk register noted and updated.`);
+      const updatedRisks: PSRReportData['risks'] = [
+        {
+          id: 'R101',
+          name: 'Phase 3 vendor delivery delay — IAM module',
+          actualRisk: escalated ? 'EXTREME' : 'HIGH',
+          treatment: 'Escalated to vendor account manager. Weekly delivery reviews in place. Recovery plan absorbs delay within Phase 3 tolerance.',
+          residualRisk: noChange ? 'MEDIUM' : escalated ? 'HIGH' : 'MEDIUM',
+        },
+        {
+          id: 'R102',
+          name: 'Skilled resource availability for Phase 3',
+          actualRisk: 'MEDIUM',
+          treatment: 'Resource plan confirmed for Phase 3. Two additional security engineers engaged.',
+          residualRisk: 'LOW',
+        },
+        ...(newRisk ? [{
+          id: 'R103',
+          name: 'New risk identified — further detail required',
+          actualRisk: 'MEDIUM' as const,
+          treatment: 'Under assessment. Risk owner to be assigned.',
+          residualRisk: 'Not Rated' as const,
+        }] : []),
+      ];
+
+      const riskComment = noChange
+        ? 'Existing risks R101 and R102 being managed within tolerance. No change to risk register this quarter.'
+        : escalated
+          ? 'R101 severity escalated. Vendor delivery risk remains highest priority. Steering committee notified.'
+          : 'New risk added to register. Owner to be assigned and treatment plan developed.';
+
+      commentsRef.current = { ...commentsRef.current, risks: riskComment };
+      const updatedStatus = { ...projectStatusRef.current, risks: riskStatus };
+      projectStatusRef.current = updatedStatus;
+      onReportUpdate(
+        { projectStatus: { ...updatedStatus }, projectStatusComments: { ...commentsRef.current }, risks: updatedRisks },
+        ['status_risks', 'risks']
+      );
+      addMsg('assistant', `Risk register updated.`);
       await new Promise(res => setTimeout(res, 600));
       await askBudgetUpdate();
 
     } else if (stage === 'followup_budget') {
       const budgetStatus: PSRReportData['projectStatus']['budget'] =
-        suggestion.includes('on track') || suggestion.includes('On track') ? 'on-track' :
+        suggestion.includes('On track') || suggestion.includes('on track') ? 'on-track' :
         suggestion.includes('Slightly') ? 'alert' : 'off-track';
 
-      const updated = { ...projectStatusRef.current, budget: budgetStatus };
-      projectStatusRef.current = updated;
-      onReportUpdate({ projectStatus: { ...updated } }, ['status_budget', 'financial_capex', 'financial_opex', 'financial_total']);
+      const budgetComment = budgetStatus === 'on-track'
+        ? 'Budget tracking within 3% of FY forecast. No corrective action required.'
+        : budgetStatus === 'alert'
+          ? 'Forecast slightly over baseline due to additional consultant engagement. Corrective action in place — no approval required.'
+          : 'Forecast significantly over baseline. Formal approval sought. Finance team notified.';
+
+      commentsRef.current = { ...commentsRef.current, budget: budgetComment };
+      const updatedStatus = { ...projectStatusRef.current, budget: budgetStatus };
+      projectStatusRef.current = updatedStatus;
+      onReportUpdate(
+        { projectStatus: { ...updatedStatus }, projectStatusComments: { ...commentsRef.current } },
+        ['status_budget', 'financial_capex', 'financial_opex', 'financial_total']
+      );
       addMsg('assistant', `Budget status recorded.`);
       await new Promise(res => setTimeout(res, 600));
       await askScheduleUpdate();
@@ -371,9 +513,47 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
         suggestion.includes('On schedule') ? 'on-track' :
         suggestion.includes('Minor') ? 'alert' : 'off-track';
 
-      const updated = { ...projectStatusRef.current, schedule: schedStatus };
-      projectStatusRef.current = updated;
-      onReportUpdate({ projectStatus: { ...updated } }, ['status_schedule']);
+      const schedComment = schedStatus === 'on-track'
+        ? 'Phase 3 IAM Rollout commenced as planned. All milestones tracking to the delivery schedule.'
+        : schedStatus === 'alert'
+          ? 'Phase 3 IAM Rollout delayed approximately 2 weeks due to vendor delivery. Recovery plan in place — expected within tolerance.'
+          : 'Phase 3 IAM Rollout milestone impacted. Revised schedule under preparation. Steering committee to be briefed.';
+
+      const updatedMilestones: PSRReportData['milestones'] = [
+        {
+          name: 'Phase 3 IAM Rollout Start',
+          priority: 'HP',
+          dueDate: '31/03/2026',
+          currentDueDate: schedStatus === 'on-track' ? '31/03/2026' : schedStatus === 'alert' ? '14/04/2026' : '30/04/2026',
+          status: schedStatus === 'on-track' ? 'In Progress' : 'Delayed',
+        },
+        {
+          name: 'SOC Integration Complete',
+          priority: 'HP',
+          dueDate: '30/04/2026',
+          currentDueDate: schedStatus === 'off-track' ? '15/05/2026' : '30/04/2026',
+          status: schedStatus === 'off-track' ? 'At Risk' : 'Pending',
+        },
+        {
+          name: 'User Awareness Training Launch',
+          priority: 'MP',
+          dueDate: '31/05/2026',
+          currentDueDate: '31/05/2026',
+          status: 'Pending',
+        },
+      ];
+
+      commentsRef.current = { ...commentsRef.current, schedule: schedComment };
+      const updatedStatus = { ...projectStatusRef.current, schedule: schedStatus };
+      projectStatusRef.current = updatedStatus;
+      onReportUpdate(
+        {
+          projectStatus: { ...updatedStatus },
+          projectStatusComments: { ...commentsRef.current },
+          milestones: updatedMilestones,
+        },
+        ['status_schedule', 'milestones']
+      );
       addMsg('assistant', `Schedule status updated.`);
       await new Promise(res => setTimeout(res, 600));
       await askNextSteps();
