@@ -350,37 +350,44 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
     if (!text) return;
     setInputValue('');
     setAwaitingCustom(false);
+    setAwaitingSuggestions(null);
 
     addMsg('user', text);
 
-    if (stage === 'memory_dump') {
+    const currentStage = stage;
+
+    if (currentStage === 'memory_dump') {
       addMsg('assistant', 'Thanks for sharing! Give me a moment while I process this and fill in your report... 🔄', undefined);
       await new Promise(res => setTimeout(res, 400));
       setIsProcessing(true);
       await processMemoryDump(text);
-    } else if (awaitingCustom) {
-      // Handle custom answers for follow-up questions
-      const currentStage = stage;
-      if (currentStage === 'followup_overall_status') {
-        await handleSuggestionSelect(text.toLowerCase().includes('on track') ? '✅ On Track — all key indicators green' : '⚠️ Alert — one or two areas need attention');
-      } else if (currentStage === 'followup_risks') {
-        onReportUpdate({}, ['risks']);
-        addMsg('assistant', `Got it — risks updated. ✅`);
-        await new Promise(res => setTimeout(res, 600));
-        await askBudgetUpdate();
-      } else if (currentStage === 'followup_budget') {
-        onReportUpdate({}, ['status_budget']);
-        addMsg('assistant', `Budget information noted. ✅`);
-        await new Promise(res => setTimeout(res, 600));
-        await askScheduleUpdate();
-      } else if (currentStage === 'followup_schedule') {
-        onReportUpdate({}, ['status_schedule']);
-        addMsg('assistant', `Schedule status noted. ✅`);
-        await new Promise(res => setTimeout(res, 600));
-        await askNextSteps();
-      } else if (currentStage === 'followup_next_steps') {
-        await finaliseReport(text);
-      }
+    } else if (currentStage === 'project_intro') {
+      const proj = allProjects.find(p => p.name.toLowerCase() === text.toLowerCase()) || allProjects[0];
+      onProjectSelect(proj.id);
+      await new Promise(res => setTimeout(res, 400));
+      addMsg('assistant',
+        `Great choice! Let's work on **${proj.name}**.\n\nI've loaded the past 3 reports in the right panel for reference. Now — tell me everything that happened this quarter. Just do a brain dump and I'll structure it for you! 🧠`
+      );
+      setStage('memory_dump');
+    } else if (currentStage === 'followup_overall_status') {
+      await handleSuggestionSelect(text.toLowerCase().includes('on track') ? '✅ On Track — all key indicators green' : '⚠️ Alert — one or two areas need attention');
+    } else if (currentStage === 'followup_risks') {
+      onReportUpdate({}, ['risks']);
+      addMsg('assistant', `Got it — risks updated. ✅`);
+      await new Promise(res => setTimeout(res, 600));
+      await askBudgetUpdate();
+    } else if (currentStage === 'followup_budget') {
+      onReportUpdate({}, ['status_budget']);
+      addMsg('assistant', `Budget information noted. ✅`);
+      await new Promise(res => setTimeout(res, 600));
+      await askScheduleUpdate();
+    } else if (currentStage === 'followup_schedule') {
+      onReportUpdate({}, ['status_schedule']);
+      addMsg('assistant', `Schedule status noted. ✅`);
+      await new Promise(res => setTimeout(res, 600));
+      await askNextSteps();
+    } else if (currentStage === 'followup_next_steps') {
+      await finaliseReport(text);
     }
   };
 
@@ -427,40 +434,53 @@ export function ChatPanel({ project, allProjects, onProjectSelect, onReportUpdat
         )}
       </div>
 
-      {/* Input */}
-      {(stage === 'memory_dump' || awaitingCustom) && (
-        <div className="shrink-0 border-t border-slate-200 p-3">
-          {stage === 'memory_dump' && messages.length > 0 && (
-            <p className="text-xs text-slate-400 mb-2 px-1">💡 Just tell me what happened — no need to be structured!</p>
-          )}
-          <div className="flex gap-2 items-end">
-            <textarea
-              ref={inputRef}
-              value={inputValue}
-              onChange={e => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={stage === 'memory_dump' ? "Tell me about your Q1 progress — milestones, risks, budget, wins, challenges..." : "Type your answer..."}
-              className="flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2a9fd6] focus:border-transparent transition-all"
-              rows={stage === 'memory_dump' ? 4 : 2}
-            />
-            <button
-              onClick={handleSubmit}
-              disabled={!inputValue.trim() || isProcessing}
-              className="shrink-0 w-10 h-10 rounded-xl bg-[#1a2456] disabled:bg-slate-300 text-white flex items-center justify-center transition-colors hover:bg-[#2a9fd6]"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12zm0 0h7.5" />
-              </svg>
-            </button>
-          </div>
+      {/* Input — always visible */}
+      <div className="shrink-0 border-t border-slate-100 bg-white px-3 py-3">
+        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 focus-within:ring-2 focus-within:ring-[#2a9fd6] focus-within:border-transparent transition-all">
+          <button
+            type="button"
+            disabled
+            className="shrink-0 w-6 h-6 flex items-center justify-center text-slate-400"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </button>
+          <textarea
+            ref={inputRef}
+            value={inputValue}
+            onChange={e => {
+              setInputValue(e.target.value);
+              e.target.style.height = 'auto';
+              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={
+              stage === 'complete'
+                ? 'Report submitted — ask me anything else...'
+                : stage === 'memory_dump'
+                  ? 'E.g., Build a portfolio status report for Q1...'
+                  : 'Type your answer...'
+            }
+            disabled={isProcessing}
+            rows={1}
+            className="flex-1 resize-none bg-transparent text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none leading-relaxed min-h-[22px] max-h-[120px] overflow-y-auto"
+            style={{ height: '22px' }}
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={!inputValue.trim() || isProcessing}
+            className="shrink-0 w-8 h-8 rounded-full bg-[#1a2456] disabled:bg-slate-200 text-white flex items-center justify-center transition-colors hover:bg-[#2a9fd6] disabled:cursor-not-allowed"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-3.5 h-3.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12zm0 0h7.5" />
+            </svg>
+          </button>
         </div>
-      )}
-
-      {stage === 'complete' && (
-        <div className="shrink-0 border-t border-slate-200 p-3 bg-emerald-50">
-          <p className="text-xs text-emerald-700 text-center font-medium">✅ Report complete! Review it on the right, then submit.</p>
-        </div>
-      )}
+        {stage === 'complete' && (
+          <p className="text-[11px] text-emerald-600 text-center mt-2 font-medium">✅ Report complete — review on the right, then submit.</p>
+        )}
+      </div>
     </div>
   );
 }
